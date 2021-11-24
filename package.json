@@ -25,7 +25,7 @@
     "form-data": "^4.0.0"
   },
   "publishConfig": {
-    "registry": "http://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/"
   },
   "repository": {
     "type": "git",
