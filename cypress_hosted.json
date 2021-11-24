@@ -1,0 +1,19 @@
+{
+  "env": {
+    "aioTests": {
+      "enableReporting": true,
+      "cloud": {
+        "apiKey": ""
+      },
+      "jiraProjectId": "NVTES",
+      "cycleDetails": {
+        "createNewCycle": true,
+        "cycleName": "Check logger cypress ",
+        "cycleKey": "NVTES-CY-2"
+      },
+      "addNewRun": false,
+      "addAttachmentToFailedCases": false,
+      "createNewRunForRetries": false
+    }
+  }
+}
