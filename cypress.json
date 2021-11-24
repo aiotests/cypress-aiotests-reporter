@@ -8,7 +8,7 @@
       "jiraProjectId": "NVTES",
       "cycleDetails": {
         "createNewCycle": true,
-        "cycleName": "Final prod test ",
+        "cycleName": "Cypress nightly runs",
         "cycleKey": "NVTES-CY-2"
       },
       "addNewRun": false,

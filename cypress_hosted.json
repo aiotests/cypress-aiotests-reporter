@@ -2,13 +2,13 @@
   "env": {
     "aioTests": {
       "enableReporting": true,
-      "cloud": {
-        "apiKey": ""
+      "hosted" : {
+        "jiraUrl": "https://jira8.aioreports.com"
       },
       "jiraProjectId": "NVTES",
       "cycleDetails": {
         "createNewCycle": true,
-        "cycleName": "Check logger cypress ",
+        "cycleName": "Cypress Nightly Run ",
         "cycleKey": "NVTES-CY-2"
       },
       "addNewRun": false,
