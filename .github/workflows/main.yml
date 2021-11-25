@@ -22,7 +22,6 @@ jobs:
         with:
           config-file: cypress_hosted.json
         env:
-          JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_PAT: ${{ secrets.JIRA_PAT }}
           
       - name: Semantic Release 🚀
