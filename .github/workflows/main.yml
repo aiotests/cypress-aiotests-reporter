@@ -5,8 +5,6 @@ on:
 
 jobs:
   test:
-    env:
-      AIO_API_KEY: ${{ secrets.AIO_API_KEY }}
     runs-on: ubuntu-latest
 
     steps:
@@ -16,6 +14,17 @@ jobs:
         uses: cypress-io/github-action@v2
         with:
           command: npm t
+        env:
+          AIO_API_KEY: ${{ secrets.AIO_API_KEY }}
+        
+      - name: Run hosted tests
+        uses: cypress-io/github-action@v2
+        with:
+          command: npm t
+          config: cypress_hosted.json
+        env:
+          JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
+          JIRA_PASSWORD: ${{ secrets.JIRA_PASSWORD }}
           
       - name: Semantic Release 🚀
         uses: cycjimmy/semantic-release-action@v2
