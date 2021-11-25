@@ -4,7 +4,7 @@
   "description": "Plugin to report cypress results to AIO Tests Jira",
   "main": "src/index.js",
   "scripts": {
-    "test": "cypress run",
+    "test": "cypress run && cypress run --config-file=cypress_hosted.json",
     "semantic-release": "semantic-release"
   },
   "keywords": [

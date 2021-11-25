@@ -1,4 +1,3 @@
-const chalk = require('chalk');
 const axios = require('axios');
 const aioLogger = require('./aio-tests-logger');
 const FormData = require('form-data');
@@ -12,10 +11,9 @@ function initAPIClient(aioConfig) {
         if(!aioConfig.cloud.apiKey && !process.env.AIO_API_KEY) {
             aioLogger.error("Cloud hosting config does not specify apiKey.  Please add \"cloud\":{\"apiKey\":\"authtoken\"}")
         } else {
-            let apiKey = process.env.AIO_API_KEY?process.env.AIO_API_KEY:  aioConfig.cloud.apiKey
+            let apiKey = process.env.AIO_API_KEY?process.env.AIO_API_KEY:  aioConfig.cloud.apiKey;
             aioAPIClient = axios.create({
                 baseURL: 'https://tcms.aioreports.com/aio-tcms/api/v1',
-                // baseURL: 'http://localhost:9090/api/v1',
                 timeout: apiTimeout,
                 headers: {'Authorization': `AioAuth ${apiKey}`}
             });
@@ -27,7 +25,7 @@ function initAPIClient(aioConfig) {
         } else {
             aioAPIClient = axios.create({
                 baseURL: aioConfig.hosted.jiraUrl + '/rest/aio-tcms-api/1.0',
-                timeout: 14000
+                timeout: apiTimeout
             });
             if(aioConfig.hosted.jiraUsername || process.env.JIRA_USERNAME) {
                 let jUsername = process.env.JIRA_USERNAME ? process.env.JIRA_USERNAME : aioConfig.hosted.jiraUsername;
@@ -39,11 +37,17 @@ function initAPIClient(aioConfig) {
             } else if(aioConfig.hosted.jiraPAT || process.env.JIRA_PAT) {
                 let jPAT = process.env.JIRA_PAT ? process.env.JIRA_PAT : aioConfig.hosted.jiraPAT;
                 aioAPIClient.defaults.headers.common['Authorization'] = `Bearer ${jPAT}`;
+            } else {
+                aioLogger.error("Server hosting config missing Jira username or PAT. " +
+                    " Please set JIRA_USERNAME/JIRA_PASSWORD or JIRA_PAT as an environment variable or add \"hosted\":{\"jiraUrl\":\"yoururl\", \"jiraUsername\":\"un\", \"jiraPassword\":\"pwd\"}" +
+                    " or \"hosted\":{\"jiraUrl\":\"yoururl\", \"jiraPAT\":\"pattoken\"} to config file");
+                aioAPIClient = null;
             }
         }
         return;
     }
-    aioLogger.error("No authentication information found.  Please add \"cloud\":{\"apiKey\":\"authtoken\"} or \"server\":{\"jiraServerUrl\":\"val\"})");
+    aioLogger.error("No authentication information found.  Please set AIO_API_KEY/JIRA_USERNAME/JIRA_PAT as an environment variable or " +
+        "add \"cloud\":{\"apiKey\":\"authtoken\"} or \"server\":{\"jiraServerUrl\":\"val\"}) to config");
 }
 
 let isAttachmentAPIAvailable = null;
@@ -51,11 +55,11 @@ const reportSpecResults = function(config, results) {
     if(!aioAPIClient) {
         initAPIClient(config);
         if(!aioAPIClient) {
-            return ;
+            return Promise.resolve("Please specify authorization details");
         }
     }
     let testData = findResults(results);
-    aioLogger.logStartEnd(" Initiating reporting results")
+    aioLogger.logStartEnd(" Initiating reporting results");
     aioLogger.log("Number of case keys found " + testData.size);
     if(testData.size > 0) {
         let caseKeys = [...testData.keys()];
@@ -75,7 +79,7 @@ function reportAllAttempts(config, key, attemptData, id, screenshots) {
     let idx = 0;
     return attemptData.reduce((resolve, attempt) => {
         return resolve.then(() => {
-            return postResult(config, key, attempt, id + (idx++) ,screenshots)
+            return postResult(config, key, attempt, id + "_" + (idx++) ,screenshots)
             });
         }, Promise.resolve()).catch(e => {
             aioLogger.error(e);
@@ -87,16 +91,17 @@ function postResult(aioConfig,caseKey, attemptData, id, screenshots ) {
         "testRunStatus": getAIORunStatus(attemptData.state),
         "effort": attemptData.wallClockDuration,
         "isAutomated": true
-    }
+    };
     if(attemptData.error) {
         data["comments"] = [attemptData.error.name + " : " + attemptData.error.message +  "\n" + attemptData.error.stack ];
     }
+    let createNewRun = id.endsWith("_0") ? !!aioConfig.addNewRun : !!aioConfig.createNewRunForRetries;
     return aioAPIClient
-        .post(`/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/testcase/${caseKey}/testrun?createNewRun=true`, data)
+        .post(`/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/testcase/${caseKey}/testrun?createNewRun=${createNewRun}`, data)
         .then(function (response) {
             aioLogger.log(`Successfully reported ${caseKey} as ${data.testRunStatus} with runID ${response.data.ID}.`);
             let runId = response.data.ID;
-            if(data.testRunStatus.toLowerCase() === "failed" && (isAttachmentAPIAvailable || isAttachmentAPIAvailable == null)) {
+            if(aioConfig.addAttachmentToFailedCases && data.testRunStatus.toLowerCase() === "failed" && (isAttachmentAPIAvailable || isAttachmentAPIAvailable == null)) {
                 return uploadAttachments(aioConfig.jiraProjectId, aioConfig.cycleDetails.cycleKeyToReportTo, runId,id, screenshots)
             }
         })
@@ -108,7 +113,7 @@ function postResult(aioConfig,caseKey, attemptData, id, screenshots ) {
 }
 
 function uploadAttachments(jiraProjectId, cyclekey,runId, id, resultScreenshots) {
-    let screenshots =  resultScreenshots.filter(t => (t.testId + t.testAttemptIndex) === id);
+    let screenshots =  resultScreenshots.filter(t => (t.testId + "_" + t.testAttemptIndex) === id);
     if(screenshots.length) {
         let promises = [];
         screenshots.forEach(s => {
@@ -138,7 +143,7 @@ function uploadAttachments(jiraProjectId, cyclekey,runId, id, resultScreenshots)
 
 function findResults(results) {
     let testData = new Map();
-    let pattern = new RegExp("\\w+-TC-\\d+", "gi")
+    let pattern = new RegExp("\\w+-TC-\\d+", "gi");
     results.tests.forEach(t => {
         let tcKeys = [];
         let allTitles = t.title.join();
@@ -148,7 +153,7 @@ function findResults(results) {
             if(match) {
                 tcKeys.push(match);
             }
-        } while(match != null)
+        } while(match != null);
         if(tcKeys.length) {
             tcKeys.forEach(tcKey => testData.set(tcKey, {attempts: t.attempts, id : t.testId}))
         }
@@ -157,23 +162,22 @@ function findResults(results) {
 }
 
 const getOrCreateCycle = (aioConfig) => {
-    aioLogger.logStartEnd("Determining cycle to update")
+    aioLogger.logStartEnd("Determining cycle to update");
     initAPIClient(aioConfig);
     if(!aioAPIClient) {
-        return Promise.resolve();
+        return Promise.resolve("Please specify valid credentials to connect with AIO Tests.");
     }
     if(!aioConfig.cycleDetails) {
-        aioLogger.error("Please specify cycleDetails in config.  eg. \"cycleDetails\": {\"cycleKey\":\"AT-CY-11\"}", true)
+        aioLogger.error("Please specify cycleDetails in config.  eg. \"cycleDetails\": {\"cycleKey\":\"AT-CY-11\"}", true);
         return Promise.resolve();
     } else {
         let aioCycleConfig = aioConfig.cycleDetails;
         if(aioCycleConfig.createNewCycle) {
             let cycleTitle = aioCycleConfig.cycleName;
             if(!!!cycleTitle){
-                aioLogger.error("createNewCycle is true in config.  New cycle name is mandatory.", true)
-                return Promise.resolve();
+                return Promise.resolve("createNewCycle is true in config.  New cycle name is mandatory.", true)
             } else {
-                aioLogger.log("Creating cycle : " + cycleTitle)
+                aioLogger.log("Creating cycle : " + cycleTitle);
                 return aioAPIClient.post("/project/"+ aioConfig.jiraProjectId+"/testcycle/detail", {
                     title: cycleTitle
                 })
@@ -183,16 +187,16 @@ const getOrCreateCycle = (aioConfig) => {
 
                     })
                     .catch(function (error) {
-                        if(error.response.status === 401) {
-                            aioLogger.error("Authorization error.  Please check credentials.")
+                        if(error.response.status === 401 || error.response.status === 403) {
+                            return Promise.resolve("Authorization error.  Please check credentials.")
                         } else {
-                            aioLogger.error(error.response.status + " : " + error.response.data);
+                            return Promise.resolve(error.response.status + " : " + error.response.data);
                         }
                     });
             }
         } else {
             if(!!!aioCycleConfig.cycleKey) {
-                aioLogger.error("createNewCycle is false in config.  Please specify a cycle key (eg. AT-CY-11) as \"cycleKey\":\"AT-CY=11\"", true);
+                return Promise.resolve("createNewCycle is false in config.  Please specify a cycle key (eg. AT-CY-11) as \"cycleKey\":\"AT-CY=11\"", true);
             } else {
                 aioCycleConfig["cycleKeyToReportTo"] = aioCycleConfig.cycleKey;
             }

@@ -3,7 +3,10 @@
     "aioTests": {
       "enableReporting": true,
       "hosted" : {
-        "jiraUrl": "https://jira8.aioreports.com"
+        "jiraUrl": "https://jira8.aioreports.com",
+        "jiraPAT": "",
+        "jiraUsername": "",
+        "jiraPassword": ""
       },
       "jiraProjectId": "NVTES",
       "cycleDetails": {
