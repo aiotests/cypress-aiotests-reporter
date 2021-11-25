@@ -11,16 +11,15 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Run tests 🧪
-        uses: cypress-io/github-action@v2
+        uses: cypress-io/github-action@v2.9.7
         with:
           command: npm t
         env:
           AIO_API_KEY: ${{ secrets.AIO_API_KEY }}
         
       - name: Run hosted tests
-        uses: cypress-io/github-action@v2
+        uses: cypress-io/github-action@v2.9.7
         with:
-          command: npm t
           config-file: cypress_hosted.json
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
