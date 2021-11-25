@@ -6,7 +6,7 @@
     "aioTests": {
       "enableReporting": true,
       "cloud": {
-        "apiKey": "NGE2M2UxMmUtOWVhZS00YmJkLTgwMzktZGYxYWNiYWFhMzEx"
+        "apiKey": ""
       },
       "jiraProjectId": "NVTES",
       "cycleDetails": {
