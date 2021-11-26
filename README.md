@@ -142,6 +142,19 @@ Authentication is supported either by providing Jira username and password or by
 | addAttachmentToFailedCases     | Set to true to attach screenshots, if available, for failed cases   |
 | createNewRunForRetries         | Set to true if each retry should create a new run   |
 
+
+# Logging
+
+AIO Tests Reporter logs can be seen in the run logs as below for successful updates
+
+![image](https://user-images.githubusercontent.com/76047755/143541114-d487efd9-2532-48fa-9a66-29c7db8d70d1.png)
+
+Errors received while updating will appear in a similar way
+
+![image](https://user-images.githubusercontent.com/76047755/143541233-94ae0f16-e40a-4f63-9989-0c372e2414e7.png)
+
+
+
 # Queries/Suggestions?
 
 For any queries, suggestions or issues, please feel free to reach out @ help@aioreports.com
