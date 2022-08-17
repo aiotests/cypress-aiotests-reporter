@@ -45,6 +45,7 @@ The AIO Tests Case key can be added to the ` describe ` and ` it ` function desc
   ```
 
 ### Setup
+1. Versions before Cypress 10
 Register the plugin to the Cypress plugins file as below:
 
 ```
@@ -55,10 +56,29 @@ module.exports = (on, config) => {
   registerAIOTestsPlugin(on,config);
 }
 ```
+2. Cypress 10 and beyond
+In Cypress 10, the pluginsFile option was removed. This option was replaced with the new setupNodeEvents().  So, the plugin registration has to happen as below in the cypress.config.js
+
+```
+// cypress.config.js
+const { defineConfig } = require("cypress");
+const { registerAIOTestsPlugin } = require('cypress-aiotests-reporter/src')
+
+module.exports = defineConfig({
+  e2e: {
+    setupNodeEvents(on, config) {
+      registerAIOTestsPlugin(on,config);
+      // implement node event listeners here
+    },
+  },
+ }
+```
 
 ### Configure
 
 The AIO Tests Reporter config needs to be set in the env property of cypress.json.  Or it can be programmatically modified in your [plugins/index.js](https://docs.cypress.io/guides/guides/environment-variables#Option-5-Plugins)
+
+For Cypress 10, cypress.json configuration file is no longer supported. Replace this configuration file with a cypress.config.js, cypress.config.ts, cypress.config.cjs or cypress.config.mjs file.
 
 Depending on the Jira hosting, the authentication information needs to be provided as below.
 
@@ -71,7 +91,7 @@ For Jira Cloud (eg. https://yourco.atlassian.net/..), the ` "cloud" ` property n
 
 
 ```
-// cypress.json
+// cypress.json (for Cypress versions < 10) or cypress.config.js (Cypress 10 and above)
 {
   "env": {
     "aioTests": {
@@ -103,7 +123,7 @@ Authentication is supported either by providing Jira username and password or by
 1. **Local runs** : For local runs, either ` "jiraUsername" + "jiraPassword" ` can be set or one can simply set the ` "jiraPAT" ` value.
 2. **CI/CD**: For CI runs, you can set the ` JIRA_USERNAME and JIRA_PASSWORD ` or ` JIRA_PAT `environment variable to pass it externally as a SECRET.
 ```
-// cypress.json
+// cypress.json (for Cypress versions < 10) or cypress.config.js (Cypress 10 and above)
 {
   "env": {
     "aioTests": {
