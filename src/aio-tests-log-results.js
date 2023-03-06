@@ -89,7 +89,7 @@ function reportAllAttempts(config, key, attemptData, id, screenshots) {
 function postResult(aioConfig,caseKey, attemptData, id, screenshots ) {
     let data = {
         "testRunStatus": getAIORunStatus(attemptData.state),
-        "effort": attemptData.wallClockDuration/1000,
+        "effort": attemptData.wallClockDuration,
         "isAutomated": true
     };
     if(attemptData.error) {
@@ -144,22 +144,20 @@ function uploadAttachments(jiraProjectId, cyclekey,runId, id, resultScreenshots)
 function findResults(results) {
     let testData = new Map();
     let pattern = new RegExp("\\w+-TC-\\d+", "gi");
-    if(results && results.tests) {
-        results.tests.forEach(t => {
-            let tcKeys = [];
-            let allTitles = t.title.join();
-            let match;
-            do {
-                match = pattern.exec(allTitles);
-                if(match) {
-                    tcKeys.push(match);
-                }
-            } while(match != null);
-            if(tcKeys.length) {
-                tcKeys.forEach(tcKey => testData.set(tcKey, {attempts: t.attempts, id : t.testId}))
+    results.tests.forEach(t => {
+        let tcKeys = [];
+        let allTitles = t.title.join();
+        let match;
+        do {
+            match = pattern.exec(allTitles);
+            if(match) {
+                tcKeys.push(match);
             }
-        });
-    }
+        } while(match != null);
+        if(tcKeys.length) {
+            tcKeys.forEach(tcKey => testData.set(tcKey, {attempts: t.attempts, id : t.testId}))
+        }
+    });
     return testData;
 }
 
