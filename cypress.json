@@ -2,6 +2,7 @@
   "retries": {
     "runMode": 1
   },
+  "nodeVersion": "bundled",
   "env": {
     "aioTests": {
       "enableReporting": true,
