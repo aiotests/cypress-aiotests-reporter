@@ -25,7 +25,7 @@ jobs:
           JIRA_PAT: ${{ secrets.JIRA_PAT }}
           
       - name: Semantic Release 🚀
-        uses: cycjimmy/semantic-release-action@v2
+        uses: cycjimmy/semantic-release-action@v3
         with:
           branch: main
         env:
