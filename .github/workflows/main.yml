@@ -18,7 +18,7 @@ jobs:
           AIO_API_KEY: ${{ secrets.AIO_API_KEY }}
         
       - name: Run hosted tests
-        uses: cypress-io/github-action@v2.9.7
+        uses: cypress-io/github-action@v5
         with:
           config-file: cypress_hosted.json
         env:
