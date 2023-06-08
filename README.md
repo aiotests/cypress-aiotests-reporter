@@ -103,11 +103,14 @@ For Jira Cloud (eg. https://yourco.atlassian.net/..), the ` "cloud" ` property n
       "cycleDetails": {
         "createNewCycle": true,
         "cycleName": "Cypress first run from plugin",
-        "cycleKey": "NVTES-CY-2"
+        "cycleKey": "NVTES-CY-2",
+        "folder": ["Cloud","Smoke Test Nightly"],
+        "tasks": ["SCRUM-1","SCRUM-2]
       },
       "addNewRun": true,
       "addAttachmentToFailedCases": true,
-      "createNewRunForRetries": true
+      "createNewRunForRetries": true,
+      "addTestBodyToComments": true
     }
   }
 }
@@ -138,11 +141,14 @@ Authentication is supported either by providing Jira username and password or by
       "cycleDetails": {
         "createNewCycle": true,
         "cycleName": "Cypress Nightly Run ",
-        "cycleKey": "SERV-CY-2"
+        "cycleKey": "SERV-CY-2",
+        "folder": ["Server","Smoke Test Nightly"],
+        "tasks": ["SERV-1","SERV-2]
       },
       "addNewRun": true,
       "addAttachmentToFailedCases": false,
-      "createNewRunForRetries": false
+      "createNewRunForRetries": false,
+      "addTestBodyToComments": true
     }
   }
 }
@@ -151,16 +157,19 @@ Authentication is supported either by providing Jira username and password or by
 
 #### Configurable values
 
-| Value                          | Description   |
-| -------------                  | ------------- |
-| enableReporting                | Set to true to make the current run update results to AIO Tests.  Default false.  |
-| jiraProjectId                  | Jira Project key to update results to  |
-| cycleDetails.createNewCycle    | Set to true to create a new cycle for run being reported                       |
-| cycleDetails.cycleName         | Works if createNewCycle is true, sets the cycle name of cycle getting created  |
-| cycleDetails.cycleKey          | AIO Tests cycle key that should be updated.  Used if createNewCycle is false   |
-| addNewRun                      | Create a new run or update an existing run in the cycle  |
-| addAttachmentToFailedCases     | Set to true to attach screenshots, if available, for failed cases   |
-| createNewRunForRetries         | Set to true if each retry should create a new run   |
+| Value                       | Description                                                                                       |
+|-----------------------------|---------------------------------------------------------------------------------------------------|
+| enableReporting             | Set to true to make the current run update results to AIO Tests.  Default false.                  |
+| jiraProjectId               | Jira Project key to update results to                                                             |
+| cycleDetails.createNewCycle | Set to true to create a new cycle for run being reported                                          |
+| cycleDetails.cycleName      | Works if createNewCycle is true, sets the cycle name of cycle getting created                     |
+| cycleDetails.cycleKey       | AIO Tests cycle key that should be updated.  Used if createNewCycle is false                      |
+| cycleDetails.folder         | Folder hierarchy, where first item in array is parent folder and so on eg.["Parent","Child"]      |
+| cycleDetails.tasks          | List of Jira Issue Keys to attach as Tasks to created cycle, impacts only when creating new cycle |
+| addNewRun                   | Create a new run or update an existing run in the cycle                                           |
+| addAttachmentToFailedCases  | Set to true to attach screenshots, if available, for failed cases                                 |
+| createNewRunForRetries      | Set to true if each retry should create a new run                                                 |
+| addTestBodyToComments       | Set to true test script body should be added as a comment in a failed case                        |
 
 
 # Logging

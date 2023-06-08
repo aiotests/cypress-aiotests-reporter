@@ -59,13 +59,13 @@ const reportSpecResults = function(config, results) {
         }
     }
     let testData = findResults(results);
-    aioLogger.logStartEnd(" Initiating reporting results");
+    aioLogger.logStartEnd(" Initiating reporting results for " + results.spec.name);
     aioLogger.log("Number of case keys found " + testData.size);
     if(testData.size > 0) {
         let caseKeys = [...testData.keys()];
         return caseKeys.reduce((r,caseKey) => {
             let attemptData = testData.get(caseKey).attempts;
-            return r.then(() => reportAllAttempts(config, caseKey, attemptData, testData.get(caseKey).id, results.screenshots));
+            return r.then(() => reportAllAttempts(config, caseKey, attemptData, testData.get(caseKey), results.screenshots));
 
         }, Promise.resolve());
     } else {
@@ -75,18 +75,18 @@ const reportSpecResults = function(config, results) {
     }
 }
 
-function reportAllAttempts(config, key, attemptData, id, screenshots) {
+function reportAllAttempts(config, key, attemptData, caseData, screenshots) {
     let idx = 0;
     return attemptData.reduce((resolve, attempt) => {
         return resolve.then(() => {
-            return postResult(config, key, attempt, id + "_" + (idx++) ,screenshots)
+            return postResult(config, key, attempt, caseData.id + "_" + (idx++) ,screenshots,caseData.body)
             });
         }, Promise.resolve()).catch(e => {
             aioLogger.error(e);
     });
 }
 
-function postResult(aioConfig,caseKey, attemptData, id, screenshots ) {
+function postResult(aioConfig,caseKey, attemptData, id, screenshots, body ) {
     let data = {
         "testRunStatus": getAIORunStatus(attemptData.state),
         "effort": attemptData.wallClockDuration/1000,
@@ -94,6 +94,9 @@ function postResult(aioConfig,caseKey, attemptData, id, screenshots ) {
     };
     if(attemptData.error) {
         data["comments"] = [attemptData.error.name + " : " + attemptData.error.message +  "\n" + attemptData.error.stack ];
+        if(!!aioConfig.addTestBodyToComments) {
+            data["comments"].push("Test Body : " + body);
+        }
     }
     let createNewRun = id.endsWith("_0") ? !!aioConfig.addNewRun : !!aioConfig.createNewRunForRetries;
     return aioAPIClient
@@ -156,11 +159,24 @@ function findResults(results) {
                 }
             } while(match != null);
             if(tcKeys.length) {
-                tcKeys.forEach(tcKey => testData.set(tcKey, {attempts: t.attempts, id : t.testId}))
+                tcKeys.forEach(tcKey => testData.set(tcKey, {attempts: t.attempts, id : t.testId, body: t.body}))
             }
         });
     }
     return testData;
+}
+
+function getOrCreateFolder(jiraProjectId, aioCycleConfig) {
+    if(aioCycleConfig.folder && aioCycleConfig.folder.length > 0 && Array.isArray(aioCycleConfig.folder)) {
+        let userFolderHierarchy = aioCycleConfig.folder.filter(f => f && !!f.trim());
+        if(userFolderHierarchy.length > 0) {
+            aioLogger.log("Creating or fetching folder " + userFolderHierarchy)
+            return aioAPIClient.put("/project/" + jiraProjectId + "/testcycle/folder/hierarchy", {
+                folderHierarchy: userFolderHierarchy
+            })
+        }
+    }
+    return Promise.resolve();
 }
 
 const getOrCreateCycle = (aioConfig) => {
@@ -180,21 +196,36 @@ const getOrCreateCycle = (aioConfig) => {
                 return Promise.resolve("createNewCycle is true in config.  New cycle name is mandatory.", true)
             } else {
                 aioLogger.log("Creating cycle : " + cycleTitle);
-                return aioAPIClient.post("/project/"+ aioConfig.jiraProjectId+"/testcycle/detail", {
-                    title: cycleTitle
-                })
-                    .then(function (response) {
-                        aioCycleConfig["cycleKeyToReportTo"] = response.data.key;
-                        aioLogger.log("Cycle created successfully : " + aioCycleConfig.cycleKeyToReportTo )
-
-                    })
-                    .catch(function (error) {
-                        if(error.response.status === 401 || error.response.status === 403) {
-                            return Promise.resolve("Authorization error.  Please check credentials.")
-                        } else {
-                            return Promise.resolve(error.response.status + " : " + error.response.data);
+                let folderCreationPromise = getOrCreateFolder(aioConfig.jiraProjectId, aioCycleConfig);
+                return folderCreationPromise.then((folderCreationResponse) => {
+                    let createCycleBody = {
+                        title: cycleTitle
+                    }
+                    if(folderCreationResponse) {
+                        createCycleBody.folder = folderCreationResponse.data;
+                    }
+                    if(aioCycleConfig.tasks && aioCycleConfig.tasks.length > 0 && Array.isArray(aioCycleConfig.tasks)) {
+                        let jiraTasks = aioCycleConfig.tasks.filter(f => f && !!f.trim());
+                        if(jiraTasks.length > 0) {
+                            createCycleBody.jiraTaskIDs = jiraTasks;
                         }
-                    });
+                    }
+                    return aioAPIClient.post("/project/"+ aioConfig.jiraProjectId+"/testcycle/detail", createCycleBody)
+                        .then(function (response) {
+                            aioCycleConfig["cycleKeyToReportTo"] = response.data.key;
+                            aioLogger.log("Cycle created successfully : " + aioCycleConfig.cycleKeyToReportTo )
+                        })
+                        .catch(function (error) {
+                            if(error.response.status === 401 || error.response.status === 403) {
+                                return Promise.resolve("Authorization error.  Please check credentials.")
+                            } else {
+                                return Promise.resolve(error.response.status + " : " + error.response.data);
+                            }
+                        });
+                }).catch(() => {
+                    return Promise.resolve("Error in fetching or creating cycle folder.  " +
+                        "Please check format of folder, for eg. [\"Cloud\",\"Release1\"]");
+                })
             }
         } else {
             if(!!!aioCycleConfig.cycleKey) {

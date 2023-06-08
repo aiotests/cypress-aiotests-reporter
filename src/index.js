@@ -33,7 +33,7 @@ const registerAIOTestsPlugin = (on, config) => {
         let aioConfig = getAIOConfig(config);
         if(aioConfig && aioConfig.cycleDetails.cycleKeyToReportTo) {
             return reporter.reportSpecResults( aioConfig, results).then(() => {
-                aioLogger.logStartEnd(" Reporting results completed.")
+                aioLogger.logStartEnd(" Reporting results completed for " + (!!spec? spec.name : ''));
             })
         }
     })
