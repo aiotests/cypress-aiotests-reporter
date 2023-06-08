@@ -13,11 +13,14 @@
       "cycleDetails": {
         "createNewCycle": false,
         "cycleName": "Cypress nightly runs",
-        "cycleKey": "NVTES-CY-64"
+        "cycleKey": "NVTES-CY-64",
+        "folder": ["Cloud","Smoke Test Nightly"],
+        "tasks": ["NVTES-1"]
       },
       "addNewRun" : true,
       "addAttachmentToFailedCases": false,
-      "createNewRunForRetries": true
+      "createNewRunForRetries": true,
+      "addTestBodyToComments": true
     }
   }
 }
