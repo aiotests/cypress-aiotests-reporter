@@ -3,8 +3,12 @@ const aioLogger = require('./aio-tests-logger');
 const FormData = require('form-data');
 const fs = require('fs');
 const apiTimeout = 10000;
-
+const rateLimitWaitTime = 60*1000;
 let aioAPIClient = null;
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 function initAPIClient(aioConfig) {
     if(aioConfig.cloud || process.env.AIO_API_KEY) {
@@ -63,14 +67,33 @@ const reportSpecResults = function(config, results) {
     aioLogger.log("Number of case keys found " + testData.size);
     if(testData.size > 0) {
         let caseKeys = [...testData.keys()];
-        return caseKeys.reduce((r,caseKey) => {
-            let attemptData = testData.get(caseKey).attempts;
-            return r.then(() => reportAllAttempts(config, caseKey, attemptData, testData.get(caseKey), results.screenshots));
+        let passedCaseKeys = [];
+        let failedCaseKeys = [];
+        caseKeys.forEach(ck => {
+            let attemptData = testData.get(ck).attempts;
+            if(attemptData.length == 1 && attemptData[0].state !== "failed") {
+                passedCaseKeys.push(ck);
+            } else {
+                failedCaseKeys.push(ck);
+            }
+        })
+        let bulkResponsePromise = Promise.resolve();
+        if(passedCaseKeys.length > 0) {
+            aioLogger.log("*".repeat(5) + " Updating passed cases " + "*".repeat(5)  );
+            bulkResponsePromise = bulkUpdateResult(config, passedCaseKeys, testData);
+        }
+        return bulkResponsePromise.then(() => {
+            if(failedCaseKeys.length > 0) {
+                aioLogger.log("*".repeat(5) + " Updating failed cases " + "*".repeat(5)  );
+            }
+            return failedCaseKeys.reduce((r,caseKey) => {
+                let attemptData = testData.get(caseKey).attempts;
+                return r.then(() => reportAllAttempts(config, caseKey, attemptData, testData.get(caseKey), results.screenshots));
+            }, Promise.resolve());
+        })
 
-        }, Promise.resolve());
     } else {
         aioLogger.log("No case keys found in specs");
-        // aioLogger.logStartEnd(" Reporting results completed.")
         return Promise.resolve();
     }
 }
@@ -86,7 +109,7 @@ function reportAllAttempts(config, key, attemptData, caseData, screenshots) {
     });
 }
 
-function postResult(aioConfig,caseKey, attemptData, id, screenshots, body ) {
+function postResult(aioConfig,caseKey, attemptData, id, screenshots, body, trialCounter = 0 ) {
     let data = {
         "testRunStatus": getAIORunStatus(attemptData.state),
         "effort": attemptData.wallClockDuration/1000,
@@ -108,9 +131,50 @@ function postResult(aioConfig,caseKey, attemptData, id, screenshots, body ) {
                 return uploadAttachments(aioConfig.jiraProjectId, aioConfig.cycleDetails.cycleKeyToReportTo, runId,id, screenshots)
             }
         })
-        .catch(err => {
-            if(err.response) {
-                aioLogger.error("Error reporting " + caseKey + " : Status Code - " + err.response.status + " - " +  err.response.data);
+        .catch(async err => {
+            if (err.response.status == 429 && trialCounter < 3) {
+                aioLogger.log("Reached AIO rate limits.  Pausing..")
+                await sleep(rateLimitWaitTime);
+                return postResult(aioConfig, caseKey, attemptData, id, screenshots, body, trialCounter++);
+            } else if (err.response) {
+                aioLogger.error("Error reporting " + caseKey + " : Status Code - " + err.response.status + " - " + err.response.data);
+            }
+        })
+}
+
+function bulkUpdateResult(aioConfig, passedCaseKeys, testData, trialCounter = 0 ) {
+
+    let bulkRequestBody = {"testRuns": []};
+    for (let passedCaseKey of passedCaseKeys) {
+        let attemptData = testData.get(passedCaseKey).attempts[0];
+        bulkRequestBody.testRuns.push( {
+            "testCaseKey": passedCaseKey,
+            "testRunStatus": getAIORunStatus(attemptData.state),
+            "effort": attemptData.wallClockDuration/1000,
+            "isAutomated": true
+        });
+    }
+
+    return aioAPIClient
+        .post(`/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/bulk/testrun/update?createNewRun=${!!aioConfig.addNewRun}`, bulkRequestBody)
+        .then(function (response) {
+            aioLogger.log(`Successfully reported  ${response.data.successCount} passed cases.`);
+            if(response.data.errorCount > 0) {
+                aioLogger.error("Failures in reporting passed cases");
+                aioLogger.error("----------------------------");
+                Object.keys(response.data.errors).forEach(k => {
+                    aioLogger.error(k + " : " + response.data.errors[k].message);
+                })
+            }
+        })
+        .catch(async err => {
+            if (err.response.status == 429 && trialCounter < 3) {
+                aioLogger.log("Reached AIO rate limits.  Pausing..")
+                await sleep(rateLimitWaitTime);
+                return bulkUpdateResult(aioConfig, passedCaseKeys, testData, trialCounter++);
+            }
+            if (err.response) {
+                aioLogger.error("Error in bulk cases reporting : Status Code - " + err.response.status + " - " + err.response.data);
             }
         })
 }
@@ -118,30 +182,35 @@ function postResult(aioConfig,caseKey, attemptData, id, screenshots, body ) {
 function uploadAttachments(jiraProjectId, cyclekey,runId, id, resultScreenshots) {
     let screenshots =  resultScreenshots.filter(t => (t.testId + "_" + t.testAttemptIndex) === id);
     if(screenshots.length) {
-        let promises = [];
-        screenshots.forEach(s => {
-                const form = new FormData();
-                form.append('file', fs.createReadStream(s.path));
-                let p = aioAPIClient.post(`/project/${jiraProjectId}/testcycle/${cyclekey}/testrun/${runId}/attachment`, form, {
-                    headers: form.getHeaders()
-                }).then(() => {
-                    aioLogger.log("Screenshot uploaded " + s.path);
-                }).catch(error => {
-                    if (error.response.status === 404) {
-                        aioLogger.error("Attachment API is not supported in current API version and hence attachments could not be uploaded.  Please upgrade to latest version of AIO Tests.");
-                        isAttachmentAPIAvailable = false;
-                    } else {
-                        if (error.data) {
-                            aioLogger.error(error.data)
-                        }
-                    }
-                });
-                promises.push(p);
-        });
-        return Promise.all(promises);
+        return screenshots.reduce((r,screenshot) => {
+            return r.then(() => uploadScreenshot(screenshot, jiraProjectId, cyclekey, runId));
+        }, Promise.resolve());
     } else {
         return Promise.resolve();
     }
+}
+
+function uploadScreenshot(s, jiraProjectId, cyclekey, runId, trialCounter = 0) {
+    const form = new FormData();
+    form.append('file', fs.createReadStream(s.path));
+    return aioAPIClient.post(`/project/${jiraProjectId}/testcycle/${cyclekey}/testrun/${runId}/attachment`, form, {
+        headers: form.getHeaders()
+    }).then(() => {
+        aioLogger.log("Screenshot uploaded " + s.path);
+    }).catch(async error => {
+        if (error.response.status == 429 && trialCounter < 3) {
+            aioLogger.log("Reached AIO rate limits.  Pausing..")
+            await sleep(rateLimitWaitTime)
+            return uploadScreenshot(s, jiraProjectId, cyclekey, runId, trialCounter++);
+        } else if (error.response.status === 404) {
+            aioLogger.error("Attachment API is not supported in current API version and hence attachments could not be uploaded.  Please upgrade to latest version of AIO Tests.");
+            isAttachmentAPIAvailable = false;
+        } else {
+            if (error.data) {
+                aioLogger.error(error.data)
+            }
+        }
+    });
 }
 
 function findResults(results) {
@@ -155,7 +224,7 @@ function findResults(results) {
             do {
                 match = pattern.exec(allTitles);
                 if(match) {
-                    tcKeys.push(match);
+                    tcKeys.push(match[0]);
                 }
             } while(match != null);
             if(tcKeys.length) {
