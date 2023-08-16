@@ -2,7 +2,7 @@ const axios = require('axios');
 const aioLogger = require('./aio-tests-logger');
 const FormData = require('form-data');
 const fs = require('fs');
-const apiTimeout = 10000;
+const apiTimeout = 25*1000;
 const rateLimitWaitTime = 60*1000;
 let aioAPIClient = null;
 
@@ -132,12 +132,14 @@ function postResult(aioConfig,caseKey, attemptData, id, screenshots, body, trial
             }
         })
         .catch(async err => {
-            if (err.response.status == 429 && trialCounter < 3) {
-                aioLogger.log("Reached AIO rate limits.  Pausing..")
-                await sleep(rateLimitWaitTime);
-                return postResult(aioConfig, caseKey, attemptData, id, screenshots, body, trialCounter++);
-            } else if (err.response) {
-                aioLogger.error("Error reporting " + caseKey + " : Status Code - " + err.response.status + " - " + err.response.data);
+            if(err.response) {
+                if (err.response.status == 429 && trialCounter < 3) {
+                    aioLogger.log("Reached AIO rate limits.  Pausing..")
+                    await sleep(rateLimitWaitTime);
+                    return postResult(aioConfig, caseKey, attemptData, id, screenshots, body, trialCounter++);
+                } else {
+                    aioLogger.error("Error reporting " + caseKey + " : Status Code - " + err.response.status + " - " + err.response.data);
+                }
             }
         })
 }
@@ -168,7 +170,7 @@ function bulkUpdateResult(aioConfig, passedCaseKeys, testData, trialCounter = 0 
             }
         })
         .catch(async err => {
-            if (err.response.status == 429 && trialCounter < 3) {
+            if (err.response && err.response.status == 429 && trialCounter < 3) {
                 aioLogger.log("Reached AIO rate limits.  Pausing..")
                 await sleep(rateLimitWaitTime);
                 return bulkUpdateResult(aioConfig, passedCaseKeys, testData, trialCounter++);
