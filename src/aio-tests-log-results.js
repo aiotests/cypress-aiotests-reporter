@@ -140,6 +140,8 @@ function postResult(aioConfig,caseKey, attemptData, id, screenshots, body, trial
                 } else {
                     aioLogger.error("Error reporting " + caseKey + " : Status Code - " + err.response.status + " - " + err.response.data);
                 }
+            } else {
+                aioLogger.error("Error in bulk cases reporting : " + err.code);
             }
         })
 }
@@ -177,6 +179,8 @@ function bulkUpdateResult(aioConfig, passedCaseKeys, testData, trialCounter = 0 
             }
             if (err.response) {
                 aioLogger.error("Error in bulk cases reporting : Status Code - " + err.response.status + " - " + err.response.data);
+            } else {
+                aioLogger.error("Error in bulk cases reporting : " + err.code);
             }
         })
 }
@@ -200,17 +204,19 @@ function uploadScreenshot(s, jiraProjectId, cyclekey, runId, trialCounter = 0) {
     }).then(() => {
         aioLogger.log("Screenshot uploaded " + s.path);
     }).catch(async error => {
-        if (error.response.status == 429 && trialCounter < 3) {
-            aioLogger.log("Reached AIO rate limits.  Pausing..")
-            await sleep(rateLimitWaitTime)
-            return uploadScreenshot(s, jiraProjectId, cyclekey, runId, trialCounter++);
-        } else if (error.response.status === 404) {
-            aioLogger.error("Attachment API is not supported in current API version and hence attachments could not be uploaded.  Please upgrade to latest version of AIO Tests.");
-            isAttachmentAPIAvailable = false;
+        if(error.response) {
+            if (error.response.status == 429 && trialCounter < 3) {
+                aioLogger.log("Reached AIO rate limits.  Pausing..")
+                await sleep(rateLimitWaitTime)
+                return uploadScreenshot(s, jiraProjectId, cyclekey, runId, trialCounter++);
+            } else if (error.response.status === 404) {
+                aioLogger.error("Attachment API is not supported in current API version and hence attachments could not be uploaded.  Please upgrade to latest version of AIO Tests.");
+                isAttachmentAPIAvailable = false;
+            }
         } else {
             if (error.data) {
                 aioLogger.error(error.data)
-            }
+            } else aioLogger.error(error.code)
         }
     });
 }
@@ -287,10 +293,12 @@ const getOrCreateCycle = (aioConfig) => {
                             aioLogger.log("Cycle created successfully : " + aioCycleConfig.cycleKeyToReportTo )
                         })
                         .catch(function (error) {
-                            if(error.response.status === 401 || error.response.status === 403) {
-                                return Promise.resolve("Authorization error.  Please check credentials.")
-                            } else {
-                                return Promise.resolve(error.response.status + " : " + error.response.data);
+                            if(error.response) {
+                                if (error.response.status === 401 || error.response.status === 403) {
+                                    return Promise.resolve("Authorization error.  Please check credentials.")
+                                } else {
+                                    return Promise.resolve(error.response.status + " : " + error.response.data);
+                                }
                             }
                         });
                 }).catch(() => {
