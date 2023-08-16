@@ -1,6 +1,6 @@
 {
   "name": "cypress-aiotests-reporter",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Plugin to report cypress results to AIO Tests Jira",
   "main": "src/index.js",
   "scripts": {

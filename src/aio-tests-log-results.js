@@ -329,8 +329,4 @@ function getAIORunStatus(cypressStatusString) {
     }
 }
 
-
-
-
-
 module.exports = { reportSpecResults, getOrCreateCycle }
