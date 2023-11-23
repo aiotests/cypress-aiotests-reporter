@@ -73,7 +73,7 @@ module.exports = defineConfig({
   },
  }
 ```
-
+Please note that due to a change in v13, screenshots can no longer be uploaded using the plugin.
 ### Configure
 
 The AIO Tests Reporter config needs to be set in the env property of cypress.json.  Or it can be programmatically modified in your [plugins/index.js](https://docs.cypress.io/guides/guides/environment-variables#Option-5-Plugins)
