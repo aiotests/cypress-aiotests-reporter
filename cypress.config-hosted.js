@@ -1,5 +1,5 @@
 const { defineConfig } = require("cypress");
-const { registerAIOTestsPlugin } = require('../../src')
+const { registerAIOTestsPlugin } = require("./src/index")
 
 module.exports = defineConfig({
   e2e: {
