@@ -8,19 +8,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Run tests 🧪
-        uses: cypress-io/github-action@v3
-        with:
-          command: npm t
+        uses: cypress-io/github-action@v6
         env:
           AIO_API_KEY: ${{ secrets.AIO_API_KEY }}
         
       - name: Run hosted tests
-        uses: cypress-io/github-action@v3
+        uses: cypress-io/github-action@v6
         with:
-          config-file: cypress_hosted.json
+          config-file: cypress.config-hosted.js
         env:
           JIRA_PAT: ${{ secrets.JIRA_PAT }}
           
