@@ -17,7 +17,7 @@ function initAPIClient(aioConfig) {
         } else {
             let apiKey = process.env.AIO_API_KEY?process.env.AIO_API_KEY:  aioConfig.cloud.apiKey;
             aioAPIClient = axios.create({
-                baseURL: 'https://tcms.aioreports.com/aio-tcms/api/v1',
+                baseURL: 'https://tcms.aiojiraapps.com/aio-tcms/api/v1',
                 timeout: apiTimeout,
                 headers: {'Authorization': `AioAuth ${apiKey}`}
             });
