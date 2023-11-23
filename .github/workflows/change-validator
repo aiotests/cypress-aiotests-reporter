@@ -1,4 +1,4 @@
-name: CI
+name: CI-change
 on:
   push:
     branches: [ change_check ]
