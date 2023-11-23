@@ -7,8 +7,12 @@ With it's Cypress reporter, AIO Tests simplifies reporting of results from the a
 
 # How does the AIO Tests Reporter work
   By hooking into Cypress events, the AIO Tests Reporter reports results in the ` after:spec ` event, after every spec run finishes.
-  <br>The reporter can create a new cycle for the executions or reuse existing cycles, based on the configuration done in cyress.json.  <br>It can also upload attachments for failed executions. <br> **Retries** can either be reported as new runs or used to update the existing run.
-
+  <br>The reporter can create a new cycle for the executions or reuse existing cycles, based on the configuration done in cyress.json.  <br>It can also upload attachments for failed executions. <br> **Retries** can either be reported as new runs or used to update the existing run.<br>
+  
+> [!NOTE]
+> Please note that with Cypress 13, Cypress has made breaking changes to its module API which used to expose data on results of executions.
+> Due to this change, AIO Tests reporter can no longer send screenshots and body information to AIO Tests.
+> If you would like to have this feature, please bump up the request @ [Cypress 13 Module API bug](https://github.com/cypress-io/cypress/issues/27732)
 # How to get started?
 ```
 npm install cypress-aiotests-reporter
@@ -73,7 +77,7 @@ module.exports = defineConfig({
   },
  }
 ```
-
+Please note that due to a change in v13, screenshots can no longer be uploaded using the plugin.
 ### Configure
 
 The AIO Tests Reporter config needs to be set in the env property of cypress.json.  Or it can be programmatically modified in your [plugins/index.js](https://docs.cypress.io/guides/guides/environment-variables#Option-5-Plugins)

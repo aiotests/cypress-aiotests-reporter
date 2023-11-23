@@ -1,15 +1,16 @@
-const chalk = require('chalk');
+const ansis = require('ansis');
 
 const AioTestsLogger = {
     log: (text) => {
         console.log(text);
     },
     error: (text, addReporter) => {
-        if(addReporter) console.log(chalk.hex('#0094a6').underline.bold('AIO Tests Reporter :'));
-        console.error( ' - ' + chalk.red(text));
+        if(addReporter) console.log(ansis.hex('#0094a6').underline.bold('AIO Tests Reporter :'));
+        console.error( ' - ' + ansis.red(text));
     },
     logStartEnd: (text) => {
-        console.log( chalk.hex('#0094a6').bold("*".repeat(15) + '  AIO Tests Reporter :' + text + "  " + "*".repeat(15)));
+        const repeatStr = "*".repeat(15);
+        console.log(ansis.hex('#0094a6').bold(`${repeatStr} AIO Tests Reporter : ${text}  ${repeatStr}`  ));
     }
 }
 
