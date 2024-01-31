@@ -15,9 +15,4 @@ describe('empty spec ', () => {
     cy.get('.todo-list li').last().should('have.text', 'Walk the dog')
   })
 
-  it(' NVTES-TC-6 : displays two todo items by default failure', () => {
-    cy.get('.todo-list li').should('have.length', 2)
-    cy.get('.todo-list li').first().should('have.text', 'Pay electric bills')
-    cy.get('.todo-list li').last().should('have.text', 'Walk the dog')
-  })
 })
