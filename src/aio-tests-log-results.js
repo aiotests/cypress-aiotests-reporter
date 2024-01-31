@@ -115,9 +115,9 @@ function postResult(aioConfig,caseKey, attemptData, caseData, screenshots, attem
         "effort": (attemptData.wallClockDuration? attemptData.wallClockDuration : (caseData.attempts.length === attemptNumber + 1? caseData.duration : 0))/1000,
         "isAutomated": true
     };
-    if(attemptData.error) {
-        data["comments"] = [attemptData.error.name + " : " + attemptData.error.message +  "\n" + attemptData.error.stack ];
-        if(!!aioConfig.addTestBodyToComments) {
+    if(attemptData.error || (data.testRunStatus === "Failed" && caseData.displayError)) {
+        data["comments"] = [caseData.displayError? caseData.displayError : attemptData.error.name + " : " + attemptData.error.message +  "\n" + attemptData.error.stack ];
+        if(!!aioConfig.addTestBodyToComments && caseData.body) {
             data["comments"].push("Test Body : " + caseData.body);
         }
     }
@@ -239,7 +239,7 @@ function findResults(results) {
                 }
             } while(match != null);
             if(tcKeys.length) {
-                tcKeys.forEach(tcKey => testData.set(tcKey, {attempts: t.attempts, id : t.testId, body: t.body, duration: t.duration}))
+                tcKeys.forEach(tcKey => testData.set(tcKey, {attempts: t.attempts, id : t.testId, body: t.body, duration: t.duration, displayError: t.displayError}))
             }
         });
     }
