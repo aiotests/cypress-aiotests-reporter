@@ -71,7 +71,7 @@ const reportSpecResults = function(config, results) {
         let failedCaseKeys = [];
         caseKeys.forEach(ck => {
             let attemptData = testData.get(ck).attempts;
-            if(attemptData.length == 1 && attemptData[0].state !== "failed") {
+            if(attemptData.length === 1 && attemptData[0].state !== "failed") {
                 passedCaseKeys.push(ck);
             } else {
                 failedCaseKeys.push(ck);
@@ -102,33 +102,33 @@ function reportAllAttempts(config, key, attemptData, caseData, screenshots) {
     let idx = 0;
     return attemptData.reduce((resolve, attempt) => {
         return resolve.then(() => {
-            return postResult(config, key, attempt, caseData.id + "_" + (idx++) ,screenshots,caseData.body)
+            return postResult(config, key, attempt, caseData ,screenshots, idx++)
             });
         }, Promise.resolve()).catch(e => {
             aioLogger.error(e);
     });
 }
 
-function postResult(aioConfig,caseKey, attemptData, id, screenshots, body, trialCounter = 0 ) {
+function postResult(aioConfig,caseKey, attemptData, caseData, screenshots, attemptNumber, trialCounter = 0 ) {
     let data = {
         "testRunStatus": getAIORunStatus(attemptData.state),
-        "effort": attemptData.wallClockDuration/1000,
+        "effort": (attemptData.wallClockDuration? attemptData.wallClockDuration : (caseData.attempts.length === attemptNumber + 1? caseData.duration : 0))/1000,
         "isAutomated": true
     };
     if(attemptData.error) {
         data["comments"] = [attemptData.error.name + " : " + attemptData.error.message +  "\n" + attemptData.error.stack ];
         if(!!aioConfig.addTestBodyToComments) {
-            data["comments"].push("Test Body : " + body);
+            data["comments"].push("Test Body : " + caseData.body);
         }
     }
-    let createNewRun = id.endsWith("_0") ? !!aioConfig.addNewRun : !!aioConfig.createNewRunForRetries;
+    let createNewRun = attemptNumber === 0 ? !!aioConfig.addNewRun : !!aioConfig.createNewRunForRetries;
     return aioAPIClient
         .post(`/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/testcase/${caseKey}/testrun?createNewRun=${createNewRun}`, data)
         .then(function (response) {
             aioLogger.log(`Successfully reported ${caseKey} as ${data.testRunStatus} with runID ${response.data.ID}.`);
             let runId = response.data.ID;
             if(aioConfig.addAttachmentToFailedCases && data.testRunStatus.toLowerCase() === "failed" && (isAttachmentAPIAvailable || isAttachmentAPIAvailable == null)) {
-                return uploadAttachments(aioConfig.jiraProjectId, aioConfig.cycleDetails.cycleKeyToReportTo, runId,id, screenshots)
+                return uploadAttachments(caseKey, aioConfig.jiraProjectId, aioConfig.cycleDetails.cycleKeyToReportTo, runId,caseData.id, screenshots, attemptNumber)
             }
         })
         .catch(async err => {
@@ -136,7 +136,7 @@ function postResult(aioConfig,caseKey, attemptData, id, screenshots, body, trial
                 if (err.response.status == 429 && trialCounter < 3) {
                     aioLogger.log("Reached AIO rate limits.  Pausing..")
                     await sleep(rateLimitWaitTime);
-                    return postResult(aioConfig, caseKey, attemptData, id, screenshots, body, trialCounter++);
+                    return postResult(aioConfig, caseKey, attemptData, caseData, screenshots, attemptNumber, trialCounter++);
                 } else {
                     aioLogger.error("Error reporting " + caseKey + " : Status Code - " + err.response.status + " - " + err.response.data);
                 }
@@ -154,7 +154,7 @@ function bulkUpdateResult(aioConfig, passedCaseKeys, testData, trialCounter = 0 
         bulkRequestBody.testRuns.push( {
             "testCaseKey": passedCaseKey,
             "testRunStatus": getAIORunStatus(attemptData.state),
-            "effort": attemptData.wallClockDuration/1000,
+            "effort": (attemptData.wallClockDuration? attemptData.wallClockDuration : testData.get(passedCaseKey).duration)/1000,
             "isAutomated": true
         });
     }
@@ -185,8 +185,11 @@ function bulkUpdateResult(aioConfig, passedCaseKeys, testData, trialCounter = 0 
         })
 }
 
-function uploadAttachments(jiraProjectId, cyclekey,runId, id, resultScreenshots) {
-    let screenshots =  resultScreenshots.filter(t => (t.testId + "_" + t.testAttemptIndex) === id);
+function uploadAttachments(caseKey, jiraProjectId, cyclekey,runId, id, resultScreenshots, attemptNumber) {
+    let screenshots =  resultScreenshots.filter(t => (t.testId + "_" + t.testAttemptIndex) === (id +"_"+attemptNumber));
+    if(resultScreenshots && !resultScreenshots[0].testId) {
+        screenshots =  resultScreenshots.filter(t => t.path.includes(caseKey) && (t.path.includes("attempt "+ (attemptNumber +1)) || (attemptNumber === 0 && !t.path.includes("(attempt "))));
+    }
     if(screenshots.length) {
         return screenshots.reduce((r,screenshot) => {
             return r.then(() => uploadScreenshot(screenshot, jiraProjectId, cyclekey, runId));
@@ -236,7 +239,7 @@ function findResults(results) {
                 }
             } while(match != null);
             if(tcKeys.length) {
-                tcKeys.forEach(tcKey => testData.set(tcKey, {attempts: t.attempts, id : t.testId, body: t.body}))
+                tcKeys.forEach(tcKey => testData.set(tcKey, {attempts: t.attempts, id : t.testId, body: t.body, duration: t.duration}))
             }
         });
     }
