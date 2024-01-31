@@ -11,7 +11,7 @@ With it's Cypress reporter, AIO Tests simplifies reporting of results from the a
   
 > [!NOTE]
 > Please note that with Cypress 13, Cypress has made breaking changes to its module API which used to expose data on results of executions.
-> Due to this change, AIO Tests reporter can no longer send screenshots and body information to AIO Tests.
+> Due to this change, AIO Tests reporter can no longer send body information and retry durations to AIO Tests.
 > If you would like to have this feature, please bump up the request @ [Cypress 13 Module API bug](https://github.com/cypress-io/cypress/issues/27732)
 # How to get started?
 ```
@@ -161,19 +161,19 @@ Authentication is supported either by providing Jira username and password or by
 
 #### Configurable values
 
-| Value                       | Description                                                                                       |
-|-----------------------------|---------------------------------------------------------------------------------------------------|
-| enableReporting             | Set to true to make the current run update results to AIO Tests.  Default false.                  |
-| jiraProjectId               | Jira Project key to update results to                                                             |
-| cycleDetails.createNewCycle | Set to true to create a new cycle for run being reported                                          |
-| cycleDetails.cycleName      | Works if createNewCycle is true, sets the cycle name of cycle getting created                     |
-| cycleDetails.cycleKey       | AIO Tests cycle key that should be updated.  Used if createNewCycle is false                      |
-| cycleDetails.folder         | Folder hierarchy, where first item in array is parent folder and so on eg.["Parent","Child"]      |
-| cycleDetails.tasks          | List of Jira Issue Keys to attach as Tasks to created cycle, impacts only when creating new cycle |
-| addNewRun                   | Create a new run or update an existing run in the cycle                                           |
-| addAttachmentToFailedCases  | Set to true to attach screenshots, if available, for failed cases                                 |
-| createNewRunForRetries      | Set to true if each retry should create a new run                                                 |
-| addTestBodyToComments       | Set to true test script body should be added as a comment in a failed case                        |
+| Value                       | Description                                                                                          |
+|-----------------------------|------------------------------------------------------------------------------------------------------|
+| enableReporting             | Set to true to make the current run update results to AIO Tests.  Default false.                     |
+| jiraProjectId               | Jira Project key to update results to                                                                |
+| cycleDetails.createNewCycle | Set to true to create a new cycle for run being reported                                             |
+| cycleDetails.cycleName      | Works if createNewCycle is true, sets the cycle name of cycle getting created                        |
+| cycleDetails.cycleKey       | AIO Tests cycle key that should be updated.  Used if createNewCycle is false                         |
+| cycleDetails.folder         | Folder hierarchy, where first item in array is parent folder and so on eg.["Parent","Child"]         |
+| cycleDetails.tasks          | List of Jira Issue Keys to attach as Tasks to created cycle, impacts only when creating new cycle    |
+| addNewRun                   | Create a new run or update an existing run in the cycle                                              |
+| addAttachmentToFailedCases  | Set to true to attach screenshots, if available, for failed cases                                    |
+| createNewRunForRetries      | Set to true if each retry should create a new run                                                    |
+| addTestBodyToComments       | Set to true test script body should be added as a comment in a failed case. Doesn't work above v12.x |
 
 
 # Logging
