@@ -22,7 +22,7 @@ const AioTestsLogger = {
     },
     debug: (text) => {
         if(this.debugMode) {
-            this.log(text)
+            console.log((this.debugMode? new Date().toLocaleTimeString() + " : " :"") + text);
         }
     }
 }
