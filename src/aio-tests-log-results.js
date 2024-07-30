@@ -2,18 +2,21 @@ const axios = require('axios');
 const aioLogger = require('./aio-tests-logger');
 const FormData = require('form-data');
 const fs = require('fs');
-const apiTimeout = 25*1000;
+const apiTimeout = 45*1000;
 const rateLimitWaitTime = 60*1000;
 let aioAPIClient = null;
-
+let debugMode = false;
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function initAPIClient(aioConfig) {
+    debugMode = !!aioConfig.debugMode;
+    aioLogger.setDebugMode(debugMode);
+    aioLogger.debug("Debug Mode is set to true");
     if(aioConfig.cloud || process.env.AIO_API_KEY) {
         if(!aioConfig.cloud.apiKey && !process.env.AIO_API_KEY) {
-            aioLogger.error("Cloud hosting config does not specify apiKey.  Please add \"cloud\":{\"apiKey\":\"authtoken\"}")
+            aioLogger.error("Cloud hosting config does not specify apiKey.  Please add \"cloud\":{\"apiKey\":\"authtoken\"}", debugMode)
         } else {
             let apiKey = process.env.AIO_API_KEY?process.env.AIO_API_KEY:  aioConfig.cloud.apiKey;
             aioAPIClient = axios.create({
@@ -90,6 +93,8 @@ const reportSpecResults = function(config, results) {
                 let attemptData = testData.get(caseKey).attempts;
                 return r.then(() => reportAllAttempts(config, caseKey, attemptData, testData.get(caseKey), results.screenshots));
             }, Promise.resolve());
+        }).catch(err => {
+            debugLogError(err);
         })
 
     } else {
@@ -122,6 +127,8 @@ function postResult(aioConfig,caseKey, attemptData, caseData, screenshots, attem
         }
     }
     let createNewRun = attemptNumber === 0 ? !!aioConfig.addNewRun : !!aioConfig.createNewRunForRetries;
+    aioLogger.debug("Posting results to " + `/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/testcase/${caseKey}/testrun?createNewRun=${createNewRun}`)
+    aioLogger.debug(data)
     return aioAPIClient
         .post(`/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/testcase/${caseKey}/testrun?createNewRun=${createNewRun}`, data)
         .then(function (response) {
@@ -132,6 +139,7 @@ function postResult(aioConfig,caseKey, attemptData, caseData, screenshots, attem
             }
         })
         .catch(async err => {
+            debugLogError(err)
             if(err.response) {
                 if (err.response.status == 429 && trialCounter < 3) {
                     aioLogger.log("Reached AIO rate limits.  Pausing..")
@@ -158,7 +166,7 @@ function bulkUpdateResult(aioConfig, passedCaseKeys, testData, trialCounter = 0 
             "isAutomated": true
         });
     }
-
+    aioLogger.debug("Reporting results in bulk " + `/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/bulk/testrun/update?createNewRun=${!!aioConfig.addNewRun}`)
     return aioAPIClient
         .post(`/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/bulk/testrun/update?createNewRun=${!!aioConfig.addNewRun}`, bulkRequestBody)
         .then(function (response) {
@@ -172,6 +180,7 @@ function bulkUpdateResult(aioConfig, passedCaseKeys, testData, trialCounter = 0 
             }
         })
         .catch(async err => {
+            debugLogError(err)
             if (err.response && err.response.status == 429 && trialCounter < 3) {
                 aioLogger.log("Reached AIO rate limits.  Pausing..")
                 await sleep(rateLimitWaitTime);
@@ -255,6 +264,8 @@ function getOrCreateFolder(jiraProjectId, aioCycleConfig) {
                 folderHierarchy: userFolderHierarchy
             })
         }
+    } else {
+        aioLogger.debug("No cycle folder information set.")
     }
     return Promise.resolve();
 }
@@ -278,6 +289,7 @@ const getOrCreateCycle = (aioConfig) => {
                 aioLogger.log("Creating cycle : " + cycleTitle);
                 let folderCreationPromise = getOrCreateFolder(aioConfig.jiraProjectId, aioCycleConfig);
                 return folderCreationPromise.then((folderCreationResponse) => {
+                    aioLogger.debug("Folder task resolved.  Creating cycle.")
                     let createCycleBody = {
                         title: cycleTitle
                     }
@@ -290,12 +302,15 @@ const getOrCreateCycle = (aioConfig) => {
                             createCycleBody.jiraTaskIDs = jiraTasks;
                         }
                     }
+                    aioLogger.debug("Cycle endpoint " + "/project/"+ aioConfig.jiraProjectId+"/testcycle/detail");
+                    aioLogger.debug(createCycleBody)
                     return aioAPIClient.post("/project/"+ aioConfig.jiraProjectId+"/testcycle/detail", createCycleBody)
                         .then(function (response) {
                             aioCycleConfig["cycleKeyToReportTo"] = response.data.key;
                             aioLogger.log("Cycle created successfully : " + aioCycleConfig.cycleKeyToReportTo )
                         })
                         .catch(function (error) {
+                            debugLogError(error);
                             if(error.response) {
                                 if (error.response.status === 401 || error.response.status === 403) {
                                     return Promise.resolve("Authorization error.  Please check credentials.")
@@ -304,7 +319,11 @@ const getOrCreateCycle = (aioConfig) => {
                                 }
                             }
                         });
-                }).catch(() => {
+                }).catch((error) => {
+                    debugLogError(error);
+                    if(error.response) {
+                        aioLogger.error(error.response.status + " : " + error.response.data)
+                    }
                     return Promise.resolve("Error in fetching or creating cycle folder.  " +
                         "Please check format of folder, for eg. [\"Cloud\",\"Release1\"]");
                 })
@@ -329,6 +348,16 @@ function getAIORunStatus(cypressStatusString) {
             return "Passed";
         default:
             return "Not Run";
+    }
+}
+
+
+function debugLogError(error){
+    if(debugMode) {
+        aioLogger.error("*** AIO Debug mode Error reporting ***")
+        aioLogger.errorObj(error.message)
+        aioLogger.errorObj(error.response? error.response.status + "  " + error.response.data : error)
+        aioLogger.error("*** AIO Debug mode Error reporting end ***")
     }
 }
 
