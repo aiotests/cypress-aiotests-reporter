@@ -25,7 +25,8 @@ module.exports = defineConfig({
       "addNewRun": false,
       "addAttachmentToFailedCases": true,
       "createNewRunForRetries": false,
-      "addTestBodyToComments": true
+      "addTestBodyToComments": true,
+      "debugMode": true
     }
   }
 });

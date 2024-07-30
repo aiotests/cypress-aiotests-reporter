@@ -114,7 +114,8 @@ For Jira Cloud (eg. https://yourco.atlassian.net/..), the ` "cloud" ` property n
       "addNewRun": true,
       "addAttachmentToFailedCases": true,
       "createNewRunForRetries": true,
-      "addTestBodyToComments": true
+      "addTestBodyToComments": true,
+      "debugMode": false
     }
   }
 }
@@ -152,7 +153,8 @@ Authentication is supported either by providing Jira username and password or by
       "addNewRun": true,
       "addAttachmentToFailedCases": false,
       "createNewRunForRetries": false,
-      "addTestBodyToComments": true
+      "addTestBodyToComments": true,
+      "debugMode": false
     }
   }
 }
@@ -174,6 +176,7 @@ Authentication is supported either by providing Jira username and password or by
 | addAttachmentToFailedCases  | Set to true to attach screenshots, if available, for failed cases                                    |
 | createNewRunForRetries      | Set to true if each retry should create a new run                                                    |
 | addTestBodyToComments       | Set to true test script body should be added as a comment in a failed case. Doesn't work above v12.x |
+| debugMode                   | Default false. Set to true to increase verbosity of logs while debugging an issue                    |
 
 
 # Logging
@@ -186,7 +189,7 @@ Errors received while updating will appear in a similar way
 
 ![image](https://user-images.githubusercontent.com/76047755/143541233-94ae0f16-e40a-4f63-9989-0c372e2414e7.png)
 
-
+To troubleshoot an issue, debugMode can be set to true in config, to increase logging verbosity and to see detailed response errors
 
 # Queries/Suggestions?
 
