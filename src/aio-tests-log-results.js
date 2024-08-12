@@ -270,7 +270,7 @@ function getOrCreateFolder(jiraProjectId, aioCycleConfig) {
     return Promise.resolve();
 }
 
-const getOrCreateCycle = (aioConfig) => {
+const getOrCreateCycle = async (aioConfig) => {
     aioLogger.logStartEnd("Determining cycle to update");
     initAPIClient(aioConfig);
     if(!aioAPIClient) {
@@ -329,12 +329,34 @@ const getOrCreateCycle = (aioConfig) => {
                 })
             }
         } else {
-            if(!!!aioCycleConfig.cycleKey) {
-                return Promise.resolve("createNewCycle is false in config.  Please specify a cycle key (eg. AT-CY-11) as \"cycleKey\":\"AT-CY=11\"", true);
-            } else {
+            let cycleFoundThroughName = true;
+            if(aioCycleConfig.cycleKey) {
                 aioCycleConfig["cycleKeyToReportTo"] = aioCycleConfig.cycleKey;
+                return Promise.resolve();
+            } else if (aioConfig.cycleDetails.cycleName) {
+               await  aioAPIClient.get("/project/" + aioConfig.jiraProjectId + "/testcycle")
+                    .then(function (response) {
+                        const items = response.data.items;
+                        const targetItem = items.find(item => item.title.toLowerCase() === aioConfig.cycleDetails.cycleName.toLowerCase());
+                        if (targetItem) {
+                            aioCycleConfig["cycleKeyToReportTo"] = targetItem.key;
+                            aioConfig.cycleDetails.cycleKeyToReportTo = targetItem.key;
+                            return Promise.resolve();
+                        }else{
+                            cycleFoundThroughName = false;
+                        }
+                    })
+                    .catch(async err => {
+                        debugLogError(err)
+                    })
+
             }
-            return Promise.resolve();
+            if(!cycleFoundThroughName){
+                return Promise.resolve(`Cycle with name "${aioConfig.cycleDetails.cycleName}" not found.`, true);
+
+            }
+            return Promise.resolve("createNewCycle is false in config.  Please specify a cycle key (eg. AT-CY-11) as \"cycleKey\":\"AT-CY=11\" or cycle name (eg. NVTES) as \"cycleName\":\"NVTES\" ", true);
+
         }
     }
 
