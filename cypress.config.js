@@ -17,6 +17,81 @@ module.exports = defineConfig({
       "jiraProjectId": "NVTES",
       "cycleDetails": {
         "createNewCycle": false,
+        "customFields": [
+          {
+            "name": "Environment",
+            "value": "Yes",
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "value": 0,
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "value": "2024-08-29T04:38:36.437Z",
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "value": "string",
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "value": "string",
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "value": "string",
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "value": [
+              "string"
+            ],
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "value": [
+              "string",
+              0,
+              true
+            ],
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "value": [
+              "string"
+            ],
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "value": 0,
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "value": [
+              0
+            ],
+            "ID": 10113
+          },
+          {
+            "name": "Environment",
+            "ID": 10113
+          }
+        ],
         "cycleName": "Cypress nightly runs ",
         "cycleKey": "NVTES-CY-65",
         "folder": ["Cloud","Smoke Test Nightly"],

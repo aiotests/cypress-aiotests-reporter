@@ -283,6 +283,7 @@ const getOrCreateCycle = async (aioConfig) => {
         let aioCycleConfig = aioConfig.cycleDetails;
         if (aioCycleConfig.createNewCycle) {
             let cycleTitle = aioCycleConfig.cycleName;
+            let customFields = aioCycleConfig.customFields;
             if (!!!cycleTitle) {
                 return Promise.resolve("createNewCycle is true in config.  New cycle name is mandatory.", true)
             } else {
@@ -291,7 +292,8 @@ const getOrCreateCycle = async (aioConfig) => {
                 return folderCreationPromise.then((folderCreationResponse) => {
                     aioLogger.debug("Folder task resolved.  Creating cycle.")
                     let createCycleBody = {
-                        title: cycleTitle
+                        title: cycleTitle,
+                        customFields: customFields || null
                     }
                     if (folderCreationResponse) {
                         createCycleBody.folder = folderCreationResponse.data;
