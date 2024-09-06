@@ -336,6 +336,9 @@ const getOrCreateCycle = async (aioConfig) => {
                 aioCycleConfig["cycleKeyToReportTo"] = aioCycleConfig.cycleKey;
                 return Promise.resolve();
             } else if (aioConfig.cycleDetails.cycleName) {
+                if (aioCycleConfig.masterBuild === false) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
                 await batchFindCycle(aioConfig, cycleFoundThroughName);
                 return Promise.resolve(`Cycle with name "${aioConfig.cycleDetails.cycleName}" not found.`, true);
             }

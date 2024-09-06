@@ -95,7 +95,8 @@ module.exports = defineConfig({
         "cycleName": "Cypress nightly runs ",
         "cycleKey": "NVTES-CY-65",
         "folder": ["Cloud","Smoke Test Nightly"],
-        "tasks": ["NVTES-1"]
+        "tasks": ["NVTES-1"],
+        "masterBuild": true
       },
       "addNewRun": false,
       "addAttachmentToFailedCases": true,
