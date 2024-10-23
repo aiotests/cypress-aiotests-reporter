@@ -128,7 +128,6 @@ function postResult(aioConfig,caseKey, attemptData, caseData, screenshots, attem
     }
     let createNewRun = attemptNumber === 0 ? !!aioConfig.addNewRun : !!aioConfig.createNewRunForRetries;
     aioLogger.debug("Posting results to " + `/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/testcase/${caseKey}/testrun?createNewRun=${createNewRun}`)
-    aioLogger.debug(data)
     return aioAPIClient
         .post(`/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/testcase/${caseKey}/testrun?createNewRun=${createNewRun}`, data)
         .then(function (response) {
@@ -270,74 +269,123 @@ function getOrCreateFolder(jiraProjectId, aioCycleConfig) {
     return Promise.resolve();
 }
 
-const getOrCreateCycle = (aioConfig) => {
+const getOrCreateCycle = async (aioConfig) => {
     aioLogger.logStartEnd("Determining cycle to update");
     initAPIClient(aioConfig);
-    if(!aioAPIClient) {
+    if (!aioAPIClient) {
         return Promise.resolve("Please specify valid credentials to connect with AIO Tests.");
     }
-    if(!aioConfig.cycleDetails) {
+    if (!aioConfig.cycleDetails) {
         aioLogger.error("Please specify cycleDetails in config.  eg. \"cycleDetails\": {\"cycleKey\":\"AT-CY-11\"}", true);
         return Promise.resolve();
     } else {
         let aioCycleConfig = aioConfig.cycleDetails;
-        if(aioCycleConfig.createNewCycle) {
-            let cycleTitle = aioCycleConfig.cycleName;
-            if(!!!cycleTitle){
-                return Promise.resolve("createNewCycle is true in config.  New cycle name is mandatory.", true)
-            } else {
-                aioLogger.log("Creating cycle : " + cycleTitle);
-                let folderCreationPromise = getOrCreateFolder(aioConfig.jiraProjectId, aioCycleConfig);
-                return folderCreationPromise.then((folderCreationResponse) => {
-                    aioLogger.debug("Folder task resolved.  Creating cycle.")
-                    let createCycleBody = {
-                        title: cycleTitle
-                    }
-                    if(folderCreationResponse) {
-                        createCycleBody.folder = folderCreationResponse.data;
-                    }
-                    if(aioCycleConfig.tasks && aioCycleConfig.tasks.length > 0 && Array.isArray(aioCycleConfig.tasks)) {
-                        let jiraTasks = aioCycleConfig.tasks.filter(f => f && !!f.trim());
-                        if(jiraTasks.length > 0) {
-                            createCycleBody.jiraTaskIDs = jiraTasks;
-                        }
-                    }
-                    aioLogger.debug("Cycle endpoint " + "/project/"+ aioConfig.jiraProjectId+"/testcycle/detail");
-                    aioLogger.debug(createCycleBody)
-                    return aioAPIClient.post("/project/"+ aioConfig.jiraProjectId+"/testcycle/detail", createCycleBody)
-                        .then(function (response) {
-                            aioCycleConfig["cycleKeyToReportTo"] = response.data.key;
-                            aioLogger.log("Cycle created successfully : " + aioCycleConfig.cycleKeyToReportTo )
-                        })
-                        .catch(function (error) {
-                            debugLogError(error);
-                            if(error.response) {
-                                if (error.response.status === 401 || error.response.status === 403) {
-                                    return Promise.resolve("Authorization error.  Please check credentials.")
-                                } else {
-                                    return Promise.resolve(error.response.status + " : " + error.response.data);
-                                }
-                            }
-                        });
-                }).catch((error) => {
-                    debugLogError(error);
-                    if(error.response) {
-                        aioLogger.error(error.response.status + " : " + error.response.data)
-                    }
-                    return Promise.resolve("Error in fetching or creating cycle folder.  " +
-                        "Please check format of folder, for eg. [\"Cloud\",\"Release1\"]");
-                })
-            }
-        } else {
-            if(!!!aioCycleConfig.cycleKey) {
-                return Promise.resolve("createNewCycle is false in config.  Please specify a cycle key (eg. AT-CY-11) as \"cycleKey\":\"AT-CY=11\"", true);
-            } else {
-                aioCycleConfig["cycleKeyToReportTo"] = aioCycleConfig.cycleKey;
-            }
-            return Promise.resolve();
+        if(!(aioCycleConfig.createNewCycle === true || aioCycleConfig.createNewCycle === false || aioCycleConfig.createNewCycle === "CREATE_IF_ABSENT" )){
+            return Promise.resolve(
+                `Invalid value for createNewCycle "${aioCycleConfig.createNewCycle}". Valid values include [true, false, "CREATE_IF_ABSENT"].`, true
+            );
         }
+        if(!aioCycleConfig.createNewCycle || aioCycleConfig.createNewCycle === "CREATE_IF_ABSENT") {
+            if (aioCycleConfig.cycleKey) {
+                aioCycleConfig["cycleKeyToReportTo"] = aioCycleConfig.cycleKey;
+                return Promise.resolve();
+            } else if (aioCycleConfig.cycleName) {
+                if (aioCycleConfig.masterBuild === false) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+                let results = await findExistingCycleThroughName(aioConfig);
+                if (!results){
+                    return;
+                }
+                else if( results === true && aioCycleConfig.createNewCycle !== "CREATE_IF_ABSENT") {
+                    return Promise.resolve(`Cycle with name "${aioConfig.cycleDetails.cycleName}" not found.`, true);
+                }else{
+                    return results;
+                }
+            }
+        }
+
+        if(aioCycleConfig.createNewCycle || aioCycleConfig.createNewCycle === "CREATE_IF_ABSENT") {
+            let cycleTitle = aioCycleConfig.cycleName;
+                let customFields = aioCycleConfig.customFields;
+                if (!!!cycleTitle) {
+                    return Promise.resolve("createNewCycle is true in config.  New cycle name is mandatory.", true)
+                } else {
+                    aioLogger.log("Creating cycle : " + cycleTitle);
+                    let folderCreationPromise = getOrCreateFolder(aioConfig.jiraProjectId, aioCycleConfig);
+                    return folderCreationPromise.then((folderCreationResponse) => {
+                        aioLogger.debug("Folder task resolved.  Creating cycle.")
+                        let createCycleBody = {
+                            title: cycleTitle,
+                            customFields: customFields || null
+                        }
+                        if (folderCreationResponse) {
+                            createCycleBody.folder = folderCreationResponse.data;
+                        }
+                        if (aioCycleConfig.tasks && aioCycleConfig.tasks.length > 0 && Array.isArray(aioCycleConfig.tasks)) {
+                            let jiraTasks = aioCycleConfig.tasks.filter(f => f && !!f.trim());
+                            if (jiraTasks.length > 0) {
+                                createCycleBody.jiraTaskIDs = jiraTasks;
+                            }
+                        }
+                        aioLogger.debug("Cycle endpoint " + "/project/" + aioConfig.jiraProjectId + "/testcycle/detail");
+                        return aioAPIClient.post("/project/" + aioConfig.jiraProjectId + "/testcycle/detail", createCycleBody)
+                            .then(function (response) {
+                                aioCycleConfig["cycleKeyToReportTo"] = response.data.key;
+                                aioLogger.log("Cycle created successfully : " + aioCycleConfig.cycleKeyToReportTo)
+                            })
+                            .catch(function (error) {
+                                debugLogError(error);
+                                if (error.response) {
+                                    if (error.response.status === 401 || error.response.status === 403) {
+                                        return Promise.resolve("Authorization error.  Please check credentials.")
+                                    } else {
+                                        return Promise.resolve(error.response.status + " : " + error.response.data);
+                                    }
+                                }
+                            });
+                    }).catch((error) => {
+                        debugLogError(error);
+                        if (error.response) {
+                            aioLogger.error(error.response.status + " : " + error.response.data)
+                        }
+                        return Promise.resolve("Error in fetching or creating cycle folder.  " +
+                            "Please check format of folder, for eg. [\"Cloud\",\"Release1\"]");
+                    })
+                }
+        }
+        return Promise.resolve("createNewCycle is false in config.  Please specify a cycle key (eg. AT-CY-11) as \"cycleKey\":\"AT-CY=11\" or cycle name (eg. NVTES) as \"cycleName\":\"NVTES\" ", true);       
     }
 
+}
+
+function findExistingCycleThroughName(aioConfig) {
+    let body = {
+        "title": {
+            "comparisonType": "EXACT_MATCH",
+            "value": aioConfig.cycleDetails.cycleName.trim()
+        }
+    }
+    return aioAPIClient.post(`/project/${aioConfig.jiraProjectId}/testcycle/search`, body)
+        .then(function (response) {
+            const items = response?.data?.items;
+            if (items && items.length > 0) {
+                aioConfig.cycleDetails["cycleKeyToReportTo"] = items[0]?.key;
+                return false;
+            }else{
+                return true;
+            }
+        })
+        .catch(function (error) {
+            debugLogError(error);
+            if (error.response) {
+                if (error.response.status === 401 || error.response.status === 403) {
+                    return Promise.resolve("Authorization error.  Please check credentials.")
+                } else {
+                    return Promise.resolve(error.response.status + " : " + error.response.data);
+                }
+            }
+        });
 }
 
 function getAIORunStatus(cypressStatusString) {
