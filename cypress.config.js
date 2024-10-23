@@ -19,76 +19,31 @@ module.exports = defineConfig({
         "createNewCycle": false,
         "customFields": [
           {
-            "name": "Environment",
+            "name": "Cycle Approved",
             "value": "Yes",
             "ID": 10113
           },
           {
-            "name": "Environment",
+            "name": "Count",
             "value": 0,
             "ID": 10113
           },
           {
-            "name": "Environment",
+            "name": "Reviewed Date",
             "value": "2024-08-29T04:38:36.437Z",
             "ID": 10113
           },
           {
-            "name": "Environment",
+            "name": "Notes",
             "value": "string",
             "ID": 10113
           },
           {
-            "name": "Environment",
-            "value": "string",
-            "ID": 10113
-          },
-          {
-            "name": "Environment",
-            "value": "string",
-            "ID": 10113
-          },
-          {
-            "name": "Environment",
+            "name": "Co-owners",
             "value": [
-              "string"
+              "912024:7459a222-3be8-4a60-bed9-32d561hfa57g",
+              "512024:8459a222-3ce8-4a60-bed9-32d561hfa57f"
             ],
-            "ID": 10113
-          },
-          {
-            "name": "Environment",
-            "ID": 10113
-          },
-          {
-            "name": "Environment",
-            "value": [
-              "string",
-              0,
-              true
-            ],
-            "ID": 10113
-          },
-          {
-            "name": "Environment",
-            "value": [
-              "string"
-            ],
-            "ID": 10113
-          },
-          {
-            "name": "Environment",
-            "value": 0,
-            "ID": 10113
-          },
-          {
-            "name": "Environment",
-            "value": [
-              0
-            ],
-            "ID": 10113
-          },
-          {
-            "name": "Environment",
             "ID": 10113
           }
         ],
