@@ -326,13 +326,17 @@ const getOrCreateCycle = async (aioConfig) => {
                     await new Promise(resolve => setTimeout(resolve, 2000));
                 }
                 let results = await findExistingCycleThroughName(aioConfig);
-                if (!results){
+                if (results === false){
+                    //Cycle found and set.
                     return;
                 }
-                else if( results === true && aioCycleConfig.createNewCycle !== "CREATE_IF_ABSENT") {
+                if(results !== true) {
+                    //Error while finding cycle.
+                    aioLogger.log(results)
+                    return;
+                }
+                if(aioCycleConfig.createNewCycle !== "CREATE_IF_ABSENT") {
                     return Promise.resolve(`Cycle with name "${aioConfig.cycleDetails.cycleName}" not found.`, true);
-                }else{
-                    return results;
                 }
             }
         }
