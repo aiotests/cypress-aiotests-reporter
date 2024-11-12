@@ -40,6 +40,16 @@ const registerAIOTestsPlugin = async (on, config) => {
             })
         }
     })
+
+    on('after:run', async () => {
+        let aioConfig = getAIOConfig(config);
+        if(aioConfig && aioConfig.runDetails) {
+            return reporter.updateRunFields( aioConfig ).then(() => {
+                aioLogger.logStartEnd("Updating run fields completed.");
+            })
+        }
+    });
+
 };
 
 module.exports = { registerAIOTestsPlugin }

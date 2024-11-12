@@ -53,6 +53,35 @@ module.exports = defineConfig({
         "tasks": ["NVTES-1"],
         "masterBuild": true
       },
+      "runDetails": {
+        "customFieldValueToUpdate": [
+          {
+            "customFieldUpdateOperationType": "ADD_TO_EXISTING",
+            "customValue": {
+              "name": "Browser Type",
+              "value": [
+                {
+                  "ID": 1212,
+                  "value": "Chrome"
+                }
+               ],
+              "ID": 10113
+            }
+          }
+        ],
+        "testRunStatus": {
+          "name": "Passed",
+          "ID": 1
+        },
+        "effort": 6000,
+        "isAutomated": true,
+        "jiraDefectsUpdate": {
+          "jiraDefectIDs": [
+            0
+          ],
+          "jiraBulkListOperationType": "ADD_TO_EXISTING"
+        }
+      },
       "addNewRun": false,
       "addAttachmentToFailedCases": true,
       "createNewRunForRetries": false,

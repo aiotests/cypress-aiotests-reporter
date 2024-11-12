@@ -6,6 +6,7 @@ const apiTimeout = 45*1000;
 const rateLimitWaitTime = 60*1000;
 let aioAPIClient = null;
 let debugMode = false;
+let allCaseKeys = [];
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -58,6 +59,36 @@ function initAPIClient(aioConfig) {
 }
 
 let isAttachmentAPIAvailable = null;
+
+const updateRunFields = async function (aioConfig){
+    if(allCaseKeys.length === 0){
+        return Promise.resolve();
+    }
+    let data = {
+        "testRunSearchRequest": {
+            "key": {
+                "comparisonType": "IN",
+                "list": allCaseKeys
+            }},
+        "testRunBulkUpdateRequest": aioConfig.runDetails
+
+    }
+    aioLogger.debug("Posting run fields to " + `/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/bulk/testrun`)
+    return await aioAPIClient
+        .put(`/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/bulk/testrun`, data)
+        .then(function (response) {
+            aioLogger.debug(`Successfully updated run fields.`);
+        })
+        .catch(async err => {
+            debugLogError(err)
+            if(err.response) {
+                aioLogger.error("Error reporting in updating run fields. " + "Status Code - " + err.response.status + " - " + err.response.data);
+            } else {
+                aioLogger.error("Error in updating run fields : " + err.code);
+            }
+        })
+}
+
 const reportSpecResults = function(config, results) {
     if(!aioAPIClient) {
         initAPIClient(config);
@@ -70,6 +101,7 @@ const reportSpecResults = function(config, results) {
     aioLogger.log("Number of case keys found " + testData.size);
     if(testData.size > 0) {
         let caseKeys = [...testData.keys()];
+        allCaseKeys.push(...caseKeys);
         let passedCaseKeys = [];
         let failedCaseKeys = [];
         caseKeys.forEach(ck => {
@@ -409,4 +441,4 @@ function debugLogError(error){
     }
 }
 
-module.exports = { reportSpecResults, getOrCreateCycle }
+module.exports = { reportSpecResults, getOrCreateCycle, updateRunFields }
