@@ -317,27 +317,26 @@ const getOrCreateCycle = async (aioConfig) => {
                 `Invalid value for createNewCycle "${aioCycleConfig.createNewCycle}". Valid values include [true, false, "CREATE_IF_ABSENT"].`, true
             );
         }
-        if(!aioCycleConfig.createNewCycle || aioCycleConfig.createNewCycle === "CREATE_IF_ABSENT") {
-            if (aioCycleConfig.cycleKey) {
-                aioCycleConfig["cycleKeyToReportTo"] = aioCycleConfig.cycleKey;
-                return Promise.resolve();
-            } else if (aioCycleConfig.cycleName) {
-                if (aioCycleConfig.masterBuild === false) {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
-                let results = await findExistingCycleThroughName(aioConfig);
-                if (results === false){
-                    //Cycle found and set.
-                    return;
-                }
-                if(results !== true) {
-                    //Error while finding cycle.
-                    aioLogger.log(results)
-                    return;
-                }
-                if(aioCycleConfig.createNewCycle !== "CREATE_IF_ABSENT") {
-                    return Promise.resolve(`Cycle with name "${aioConfig.cycleDetails.cycleName}" not found.`, true);
-                }
+        if(!aioCycleConfig.createNewCycle && aioCycleConfig.cycleKey){
+            aioCycleConfig["cycleKeyToReportTo"] = aioCycleConfig.cycleKey;
+            return Promise.resolve();
+        }
+        if (aioCycleConfig.createNewCycle === "CREATE_IF_ABSENT" && aioCycleConfig.cycleName) {
+            if (aioCycleConfig.masterBuild === false) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            let results = await findExistingCycleThroughName(aioConfig);
+            if (results === false) {
+                //Cycle found and set.
+                return;
+            }
+            if (results !== true) {
+                //Error while finding cycle.
+                aioLogger.log(results)
+                return;
+            }
+            if (aioCycleConfig.createNewCycle !== "CREATE_IF_ABSENT") {
+                return Promise.resolve(`Cycle with name "${aioConfig.cycleDetails.cycleName}" not found.`, true);
             }
         }
 
@@ -345,7 +344,7 @@ const getOrCreateCycle = async (aioConfig) => {
             let cycleTitle = aioCycleConfig.cycleName;
                 let customFields = aioCycleConfig.customFields;
                 if (!!!cycleTitle) {
-                    return Promise.resolve("createNewCycle is true in config.  New cycle name is mandatory.", true)
+                    return Promise.resolve("createNewCycle is " +aioCycleConfig.createNewCycle +" in config.  New cycle name is mandatory.", true)
                 } else {
                     aioLogger.log("Creating cycle : " + cycleTitle);
                     let folderCreationPromise = getOrCreateFolder(aioConfig.jiraProjectId, aioCycleConfig);
