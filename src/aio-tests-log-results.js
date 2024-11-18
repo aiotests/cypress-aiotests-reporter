@@ -4,6 +4,8 @@ const FormData = require('form-data');
 const fs = require('fs');
 const apiTimeout = 45*1000;
 const rateLimitWaitTime = 60*1000;
+const CREATE_IF_ABSENT = "CREATE_IF_ABSENT";
+const createNewCycleOptions = [true, false, "true", "false", CREATE_IF_ABSENT];
 let aioAPIClient = null;
 let debugMode = false;
 let allCaseKeys = [];
@@ -60,8 +62,28 @@ function initAPIClient(aioConfig) {
 
 let isAttachmentAPIAvailable = null;
 
+function getCustomFieldValueToUpdate(customFieldsToUpdate) {
+    let cfUpdates = [];
+    if(customFieldsToUpdate) {
+        customFieldsToUpdate.forEach(cf => {
+            let data = {"customValue":{"name":cf.name, "value": cf.value}};
+            if(cf.operationType) {
+                data["customFieldUpdateOperationType"] = cf.operationType;
+            }
+            cfUpdates.push(data);
+        })
+    }
+    return cfUpdates;
+}
+
 const updateRunFields = async function (aioConfig){
     if(allCaseKeys.length === 0){
+        aioLogger.debug("No cases to update for bulk update of run custom fields.")
+        return Promise.resolve();
+    }
+    const cfUpdates = getCustomFieldValueToUpdate(aioConfig.runDetails.customFieldsToUpdate);
+    if(!cfUpdates.length) {
+        aioLogger.debug("No custom fields data found.")
         return Promise.resolve();
     }
     let data = {
@@ -70,8 +92,7 @@ const updateRunFields = async function (aioConfig){
                 "comparisonType": "IN",
                 "list": allCaseKeys
             }},
-        "testRunBulkUpdateRequest": aioConfig.runDetails
-
+        "testRunBulkUpdateRequest": {"customFieldValueToUpdate" : cfUpdates}
     }
     aioLogger.debug("Posting run fields to " + `/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/bulk/testrun`)
     return await aioAPIClient
@@ -172,7 +193,7 @@ function postResult(aioConfig,caseKey, attemptData, caseData, screenshots, attem
         .catch(async err => {
             debugLogError(err)
             if(err.response) {
-                if (err.response.status == 429 && trialCounter < 3) {
+                if (err.response.status === 429 && trialCounter < 3) {
                     aioLogger.log("Reached AIO rate limits.  Pausing..")
                     await sleep(rateLimitWaitTime);
                     return postResult(aioConfig, caseKey, attemptData, caseData, screenshots, attemptNumber, trialCounter++);
@@ -312,103 +333,105 @@ const getOrCreateCycle = async (aioConfig) => {
         return Promise.resolve();
     } else {
         let aioCycleConfig = aioConfig.cycleDetails;
-        if(!(aioCycleConfig.createNewCycle === true || aioCycleConfig.createNewCycle === false || aioCycleConfig.createNewCycle === "CREATE_IF_ABSENT" )){
+        if(!(createNewCycleOptions.includes(aioCycleConfig.createNewCycle))){
             return Promise.resolve(
-                `Invalid value for createNewCycle "${aioCycleConfig.createNewCycle}". Valid values include [true, false, "CREATE_IF_ABSENT"].`, true
+                `Invalid value for createNewCycle "${aioCycleConfig.createNewCycle}". Valid values include ${createNewCycleOptions}.`
             );
         }
-        if(!aioCycleConfig.createNewCycle && aioCycleConfig.cycleKey){
+        if((!aioCycleConfig.createNewCycle || "false" === aioCycleConfig.createNewCycle) && aioCycleConfig.cycleKey){
             aioCycleConfig["cycleKeyToReportTo"] = aioCycleConfig.cycleKey;
             return Promise.resolve();
         }
-        if (aioCycleConfig.createNewCycle === "CREATE_IF_ABSENT" && aioCycleConfig.cycleName) {
-            if (aioCycleConfig.masterBuild === false) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-            let results = await findExistingCycleThroughName(aioConfig);
-            if (results === false) {
-                //Cycle found and set.
-                return;
-            }
-            if (results !== true) {
-                //Error while finding cycle.
-                aioLogger.log(results)
-                return;
-            }
-            if (aioCycleConfig.createNewCycle !== "CREATE_IF_ABSENT") {
-                return Promise.resolve(`Cycle with name "${aioConfig.cycleDetails.cycleName}" not found.`, true);
-            }
-        }
 
-        if(aioCycleConfig.createNewCycle || aioCycleConfig.createNewCycle === "CREATE_IF_ABSENT") {
+        if(aioCycleConfig.createNewCycle === true || "true" === aioCycleConfig.createNewCycle || aioCycleConfig.createNewCycle === CREATE_IF_ABSENT) {
             let cycleTitle = aioCycleConfig.cycleName;
-                let customFields = aioCycleConfig.customFields;
-                if (!!!cycleTitle) {
-                    return Promise.resolve("createNewCycle is " +aioCycleConfig.createNewCycle +" in config.  New cycle name is mandatory.", true)
-                } else {
-                    aioLogger.log("Creating cycle : " + cycleTitle);
-                    let folderCreationPromise = getOrCreateFolder(aioConfig.jiraProjectId, aioCycleConfig);
-                    return folderCreationPromise.then((folderCreationResponse) => {
-                        aioLogger.debug("Folder task resolved.  Creating cycle.")
-                        let createCycleBody = {
-                            title: cycleTitle,
-                            customFields: customFields || null
-                        }
-                        if (folderCreationResponse) {
-                            createCycleBody.folder = folderCreationResponse.data;
-                        }
-                        if (aioCycleConfig.tasks && aioCycleConfig.tasks.length > 0 && Array.isArray(aioCycleConfig.tasks)) {
-                            let jiraTasks = aioCycleConfig.tasks.filter(f => f && !!f.trim());
-                            if (jiraTasks.length > 0) {
-                                createCycleBody.jiraTaskIDs = jiraTasks;
-                            }
-                        }
-                        aioLogger.debug("Cycle endpoint " + "/project/" + aioConfig.jiraProjectId + "/testcycle/detail");
-                        return aioAPIClient.post("/project/" + aioConfig.jiraProjectId + "/testcycle/detail", createCycleBody)
-                            .then(function (response) {
-                                aioCycleConfig["cycleKeyToReportTo"] = response.data.key;
-                                aioLogger.log("Cycle created successfully : " + aioCycleConfig.cycleKeyToReportTo)
-                            })
-                            .catch(function (error) {
-                                debugLogError(error);
-                                if (error.response) {
-                                    if (error.response.status === 401 || error.response.status === 403) {
-                                        return Promise.resolve("Authorization error.  Please check credentials.")
-                                    } else {
-                                        return Promise.resolve(error.response.status + " : " + error.response.data);
-                                    }
-                                }
-                            });
-                    }).catch((error) => {
+            let customFields = aioCycleConfig.customFields;
+            if (!!!cycleTitle) {
+                return Promise.resolve("createNewCycle is set to " + aioCycleConfig.createNewCycle +" in config.  Please set cycleName.")
+            }
+            if(aioCycleConfig.createNewCycle === CREATE_IF_ABSENT) {
+                let results = await findExistingCycleThroughName(aioConfig);
+                if (results === true) {
+                    aioLogger.debug("Existing cycle found")
+                    //Cycle found and set.
+                    return;
+                }
+                if (results !== false) {
+                    //Error while finding cycle.
+                    aioLogger.log(results)
+                    return;
+                }
+            }
+
+            aioLogger.log("Creating cycle : " + cycleTitle);
+            let folderCreationPromise = getOrCreateFolder(aioConfig.jiraProjectId, aioCycleConfig);
+            return folderCreationPromise.then((folderCreationResponse) => {
+                aioLogger.debug("Folder task resolved.  Creating cycle.")
+                let createCycleBody = {
+                    title: cycleTitle,
+                    customFields: customFields || null
+                }
+                if (folderCreationResponse) {
+                    createCycleBody.folder = folderCreationResponse.data;
+                }
+                if (aioCycleConfig.tasks && aioCycleConfig.tasks.length > 0 && Array.isArray(aioCycleConfig.tasks)) {
+                    let jiraTasks = aioCycleConfig.tasks.filter(f => f && !!f.trim());
+                    if (jiraTasks.length > 0) {
+                        createCycleBody.jiraTaskIDs = jiraTasks;
+                    }
+                }
+                aioLogger.debug("Cycle endpoint " + "/project/" + aioConfig.jiraProjectId + "/testcycle/detail");
+                return aioAPIClient.post("/project/" + aioConfig.jiraProjectId + "/testcycle/detail", createCycleBody)
+                    .then(function (response) {
+                        aioCycleConfig["cycleKeyToReportTo"] = response.data.key;
+                        aioLogger.log("Cycle created successfully : " + aioCycleConfig.cycleKeyToReportTo)
+                    })
+                    .catch(function (error) {
                         debugLogError(error);
                         if (error.response) {
-                            aioLogger.error(error.response.status + " : " + error.response.data)
+                            if (error.response.status === 401 || error.response.status === 403) {
+                                return Promise.resolve("Authorization error.  Please check credentials.")
+                            } else {
+                                return Promise.resolve(error.response.status + " : " + error.response.data);
+                            }
                         }
-                        return Promise.resolve("Error in fetching or creating cycle folder.  " +
-                            "Please check format of folder, for eg. [\"Cloud\",\"Release1\"]");
-                    })
+                    });
+            }).catch((error) => {
+                debugLogError(error);
+                if (error.response) {
+                    aioLogger.error(error.response.status + " : " + error.response.data)
                 }
+                return Promise.resolve("Error in fetching or creating cycle folder.  " +
+                    "Please check format of folder, for eg. [\"Cloud\",\"Release1\"]");
+            })
+
         }
-        return Promise.resolve("createNewCycle is false in config.  Please specify a cycle key (eg. AT-CY-11) as \"cycleKey\":\"AT-CY=11\" or cycle name (eg. NVTES) as \"cycleName\":\"NVTES\" ", true);       
+        return Promise.resolve("createNewCycle is false in config.  Please specify a cycle key (eg. AT-CY-11) as \"cycleKey\":\"AT-CY=11\" or cycle name (eg. NVTES) as \"cycleName\":\"NVTES\" ", true);
     }
 
 }
 
-function findExistingCycleThroughName(aioConfig) {
+async function findExistingCycleThroughName(aioConfig) {
+    if (aioConfig.parallelBuild && aioConfig.parallelBuild.masterBuild === false) {
+        let to = aioConfig.parallelBuild.waitForSeconds? aioConfig.parallelBuild.waitForSeconds: 2;
+        aioLogger.log(`Waiting for ${to} seconds for master build to finish`)
+        await new Promise(resolve => setTimeout(resolve, to*1000));
+    }
     let body = {
         "title": {
             "comparisonType": "EXACT_MATCH",
             "value": aioConfig.cycleDetails.cycleName.trim()
         }
     }
+    aioLogger.log("Finding cycle with name : " + aioConfig.cycleDetails.cycleName.trim())
     return aioAPIClient.post(`/project/${aioConfig.jiraProjectId}/testcycle/search`, body)
         .then(function (response) {
             const items = response?.data?.items;
             if (items && items.length > 0) {
                 aioConfig.cycleDetails["cycleKeyToReportTo"] = items[0]?.key;
-                return false;
-            }else{
                 return true;
+            } else {
+                return false;
             }
         })
         .catch(function (error) {
