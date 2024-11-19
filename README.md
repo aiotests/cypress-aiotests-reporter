@@ -105,17 +105,59 @@ For Jira Cloud (eg. https://yourco.atlassian.net/..), the ` "cloud" ` property n
       },
       "jiraProjectId": "SCRUM",
       "cycleDetails": {
-        "createNewCycle": true,
+        "createNewCycle": true, //possible values "true","false","CREATE_IF_ABSENT", true, false
         "cycleName": "Cypress first run from plugin",
         "cycleKey": "NVTES-CY-2",
         "folder": ["Cloud","Smoke Test Nightly"],
-        "tasks": ["SCRUM-1","SCRUM-2]
+        "tasks": ["SCRUM-1","SCRUM-2],
+        "customFields": [
+          {
+            "name": "Reviewed? [Boolean CF]",
+            "value": "Yes",
+          },
+          {
+            "name": "Set (Single Select CF)", 
+            "value": {"value":"P1"}
+          },
+          {
+            "name": "Teams (Multi Select CF)", 
+            "value": [{"value":"TeamAlpha"},{"value":"Zeta"}]
+          },
+          {
+            "name": "NumberCF", "value": 0
+          },
+          {
+            "name": "TextValue CF", "value": "This can be a long note",
+          },
+          {
+            "name": "Reviewed Date", "value": "2024-08-29T04:38:36.437Z",
+          },
+          {
+            "name": "SME [User CF]", "value": "<accountid of user>"
+          }
+        ],
+      },
+       "runDetails": {
+        "customFieldsToUpdate": [
+          {
+            "operationType": "ADD_TO_EXISTING",
+            "name": "StepOwner",
+            "value": [{"value": "Val2"},{"value": "Val1"}]
+          },
+          {
+            "name": "Env", "value": {"value":"UAT"}
+          }
+        ]
       },
       "addNewRun": true,
       "addAttachmentToFailedCases": true,
       "createNewRunForRetries": true,
       "addTestBodyToComments": true,
-      "debugMode": false
+      "debugMode": false,
+      "parallelBuild":{ //optional
+        "masterBuild": true,
+        "waitForSeconds": 10 //defaults to 2 seconds
+      }
     }
   }
 }
@@ -144,17 +186,59 @@ Authentication is supported either by providing Jira username and password or by
       },
       "jiraProjectId": "SERV",
       "cycleDetails": {
-        "createNewCycle": true,
+        "createNewCycle": true, //possible values "true","false","CREATE_IF_ABSENT", true, false
         "cycleName": "Cypress Nightly Run ",
         "cycleKey": "SERV-CY-2",
         "folder": ["Server","Smoke Test Nightly"],
-        "tasks": ["SERV-1","SERV-2]
+        "tasks": ["SERV-1","SERV-2],
+        "customFields": [
+          {
+            "name": "Reviewed? [Boolean CF]",
+            "value": "Yes",
+          },
+          {
+            "name": "Set (Single Select CF)", 
+            "value": {"value":"P1"}
+          },
+          {
+            "name": "Teams (Multi Select CF)", 
+            "value": [{"value":"TeamAlpha"},{"value":"Zeta"}]
+          },
+          {
+            "name": "NumberCF", "value": 0
+          },
+          {
+            "name": "TextValue CF", "value": "This can be a long note",
+          },
+          {
+            "name": "Reviewed Date", "value": "2024-08-29T04:38:36.437Z",
+          },
+          {
+            "name": "SME [User CF]", "value": "<accountid of user>"
+          }
+        ],
+      },
+      "runDetails": {
+        "customFieldsToUpdate": [
+          {
+            "operationType": "ADD_TO_EXISTING",
+            "name": "StepOwner",
+            "value": [{"value": "Val2"},{"value": "Val1"}]
+          },
+          {
+            "name": "Env", "value": {"value":"UAT"}
+          }
+        ]
       },
       "addNewRun": true,
       "addAttachmentToFailedCases": false,
       "createNewRunForRetries": false,
       "addTestBodyToComments": true,
-      "debugMode": false
+      "debugMode": false,
+      "parallelBuild":{ //optional
+        "masterBuild": true,
+        "waitForSeconds": 10 //defaults to 2 seconds
+      }
     }
   }
 }
@@ -163,21 +247,41 @@ Authentication is supported either by providing Jira username and password or by
 
 #### Configurable values
 
-| Value                       | Description                                                                                          |
-|-----------------------------|------------------------------------------------------------------------------------------------------|
-| enableReporting             | Set to true to make the current run update results to AIO Tests.  Default false.                     |
-| jiraProjectId               | Jira Project key to update results to                                                                |
-| cycleDetails.createNewCycle | Set to true to create a new cycle for run being reported                                             |
-| cycleDetails.cycleName      | Works if createNewCycle is true, sets the cycle name of cycle getting created                        |
-| cycleDetails.cycleKey       | AIO Tests cycle key that should be updated.  Used if createNewCycle is false                         |
-| cycleDetails.folder         | Folder hierarchy, where first item in array is parent folder and so on eg.["Parent","Child"]         |
-| cycleDetails.tasks          | List of Jira Issue Keys to attach as Tasks to created cycle, impacts only when creating new cycle    |
-| addNewRun                   | Create a new run or update an existing run in the cycle                                              |
-| addAttachmentToFailedCases  | Set to true to attach screenshots, if available, for failed cases                                    |
-| createNewRunForRetries      | Set to true if each retry should create a new run                                                    |
-| addTestBodyToComments       | Set to true test script body should be added as a comment in a failed case. Doesn't work above v12.x |
-| debugMode                   | Default false. Set to true to increase verbosity of logs while debugging an issue                    |
+| Value                              | Description                                                                                              |
+|------------------------------------|----------------------------------------------------------------------------------------------------------|
+| enableReporting                    | Set to true to make the current run update results to AIO Tests.  Default false.                         |
+| jiraProjectId                      | Jira Project key to update results to                                                                    |
+| cycleDetails.createNewCycle        | Options: [true, false, "CREATE_IF_ABSENT"]. Set to true to create a new cycle for run being reported.    |
+| cycleDetails.cycleName             | Works if createNewCycle is true, sets the cycle name of cycle getting created                            |
+| cycleDetails.cycleKey              | AIO Tests cycle key that should be updated.  Used if createNewCycle is false                             |
+| cycleDetails.folder                | Folder hierarchy, where first item in array is parent folder and so on eg.["Parent","Child"]             |
+| cycleDetails.tasks                 | List of Jira Issue Keys to attach as Tasks to created cycle, impacts only when creating new cycle        |
+| cycleDetails.customFields          | List of custom fields that need to be set while creating cycle.  Options shown in example.               |
+| addNewRun                          | Create a new run or update an existing run in the cycle                                                  |
+| addAttachmentToFailedCases         | Set to true to attach screenshots, if available, for failed cases                                        |
+| createNewRunForRetries             | Set to true if each retry should create a new run                                                        |
+| addTestBodyToComments              | Set to true test script body should be added as a comment in a failed case. **Doesn't work above v12.x** |
+| runDetails.customFieldsToUpdate    | List of run level custom fields.  Options in example above.                                              |
+| customFieldsToUpdate.operationType | Options:  ADD_TO_EXISTING, REPLACE_EXISTING, DELETE_EXISTING                                             |
+| debugMode                          | Default false. Set to true to increase verbosity of logs while debugging an issue                        |
+| parallelBuild.masterBuild          | Optional. Default true. See below for details on parallelBuild                                           |
+| parallelBuild.waitForSeconds       | Optional. Default 2 seconds. See below for details on parallelBuild                                      |
 
+#### Create New Cycle options
+
+- createNewCycle = true or "true", uses the **cycleName** and cycleDetails value to generate new cycle
+- createNewCycle = false or "false", uses the **cycleKey** value to find an existing cycle and updates the cycle.  If cycle is not found, an error is thrown
+- createNewCycle = "CREATE_IF_ABSENT" uses the **cycleName** to search for an existing cycle with an exact match.  If cycle is found, then the cycle is updated.
+If it is not found, then a new cycle is created using **cycleName** and **cycleDetails**
+
+#### Parallel builds
+
+If multiple builds are being triggered in parallel, the parallelBuild setting can be used to specify the masterBuild.  
+One of the parallel builds can be configured to set **masterBuild as true**.  This build should have createNewCycle either set as true or CREATE_IF_ABSENT.  
+The other builds running in parallel can have masterBuild set to false, which would imply, they would wait for the masterBuild to run the cycle creation code, waiting for
+**waitForSeconds** (defaults to 2 seconds), before trying to find the cycle.
+
+If multiple builds are not being run in parallel, the parallelBuild value can be ignored.
 
 # Logging
 
