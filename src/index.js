@@ -15,17 +15,20 @@ function getAIOConfig(config, reportError) {
     }
 }
 
-const registerAIOTestsPlugin = (on, config) => {
-    on('before:run', () => {
+const registerAIOTestsPlugin = async (on, config) => {
+    on('before:run', async () => {
         let aioConfig = getAIOConfig(config, true);
-        if(aioConfig) {
-            return reporter.getOrCreateCycle(aioConfig).then((data) => {
-                if(aioConfig.cycleDetails.cycleKeyToReportTo) {
+        if (aioConfig) {
+            try {
+                const data = await reporter.getOrCreateCycle(aioConfig);
+                if (aioConfig.cycleDetails.cycleKeyToReportTo) {
                     aioLogger.log("Reporting results to cycle : " + aioConfig.cycleDetails.cycleKeyToReportTo);
                 } else {
                     aioLogger.error(data);
                 }
-            })
+            } catch (err) {
+                aioLogger.error("An error occurred: " + err.message);
+            }
         }
     });
 
@@ -37,6 +40,16 @@ const registerAIOTestsPlugin = (on, config) => {
             })
         }
     })
+
+    on('after:run', async () => {
+        let aioConfig = getAIOConfig(config);
+        if(aioConfig && aioConfig.runDetails) {
+            return reporter.updateRunFields( aioConfig ).then(() => {
+                aioLogger.logStartEnd("Updating run fields completed.");
+            })
+        }
+    });
+
 };
 
 module.exports = { registerAIOTestsPlugin }

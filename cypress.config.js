@@ -17,16 +17,20 @@ module.exports = defineConfig({
       "jiraProjectId": "NVTES",
       "cycleDetails": {
         "createNewCycle": false,
-        "cycleName": "Cypress nightly runs ",
+        "cycleName": "Cypress nightly runs 4",
         "cycleKey": "NVTES-CY-65",
         "folder": ["Cloud","Smoke Test Nightly"],
-        "tasks": ["NVTES-1"]
+        "tasks": ["NVTES-1"],
       },
       "addNewRun": false,
       "addAttachmentToFailedCases": true,
       "createNewRunForRetries": false,
       "addTestBodyToComments": true,
-      "debugMode": true
+      "debugMode": true,
+      "parallelBuild":{
+        "masterBuild": true,
+        "waitForSeconds": 10
+      }
     }
   }
 });
