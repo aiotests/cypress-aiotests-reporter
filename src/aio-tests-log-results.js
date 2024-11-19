@@ -4,8 +4,11 @@ const FormData = require('form-data');
 const fs = require('fs');
 const apiTimeout = 45*1000;
 const rateLimitWaitTime = 60*1000;
+const CREATE_IF_ABSENT = "CREATE_IF_ABSENT";
+const createNewCycleOptions = [true, false, "true", "false", CREATE_IF_ABSENT];
 let aioAPIClient = null;
 let debugMode = false;
+let allCaseKeys = [];
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -58,6 +61,55 @@ function initAPIClient(aioConfig) {
 }
 
 let isAttachmentAPIAvailable = null;
+
+function getCustomFieldValueToUpdate(customFieldsToUpdate) {
+    let cfUpdates = [];
+    if(customFieldsToUpdate) {
+        customFieldsToUpdate.forEach(cf => {
+            let data = {"customValue":{"name":cf.name, "value": cf.value}};
+            if(cf.operationType) {
+                data["customFieldUpdateOperationType"] = cf.operationType;
+            }
+            cfUpdates.push(data);
+        })
+    }
+    return cfUpdates;
+}
+
+const updateRunFields = async function (aioConfig){
+    if(allCaseKeys.length === 0){
+        aioLogger.debug("No cases to update for bulk update of run custom fields.")
+        return Promise.resolve();
+    }
+    const cfUpdates = getCustomFieldValueToUpdate(aioConfig.runDetails.customFieldsToUpdate);
+    if(!cfUpdates.length) {
+        aioLogger.debug("No custom fields data found.")
+        return Promise.resolve();
+    }
+    let data = {
+        "testRunSearchRequest": {
+            "key": {
+                "comparisonType": "IN",
+                "list": allCaseKeys
+            }},
+        "testRunBulkUpdateRequest": {"customFieldValueToUpdate" : cfUpdates}
+    }
+    aioLogger.debug("Posting run fields to " + `/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/bulk/testrun`)
+    return await aioAPIClient
+        .put(`/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/bulk/testrun`, data)
+        .then(function (response) {
+            aioLogger.debug(`Successfully updated run fields.`);
+        })
+        .catch(async err => {
+            debugLogError(err)
+            if(err.response) {
+                aioLogger.error("Error reporting in updating run fields. " + "Status Code - " + err.response.status + " - " + err.response.data);
+            } else {
+                aioLogger.error("Error in updating run fields : " + err.code);
+            }
+        })
+}
+
 const reportSpecResults = function(config, results) {
     if(!aioAPIClient) {
         initAPIClient(config);
@@ -70,6 +122,7 @@ const reportSpecResults = function(config, results) {
     aioLogger.log("Number of case keys found " + testData.size);
     if(testData.size > 0) {
         let caseKeys = [...testData.keys()];
+        allCaseKeys.push(...caseKeys);
         let passedCaseKeys = [];
         let failedCaseKeys = [];
         caseKeys.forEach(ck => {
@@ -128,7 +181,6 @@ function postResult(aioConfig,caseKey, attemptData, caseData, screenshots, attem
     }
     let createNewRun = attemptNumber === 0 ? !!aioConfig.addNewRun : !!aioConfig.createNewRunForRetries;
     aioLogger.debug("Posting results to " + `/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/testcase/${caseKey}/testrun?createNewRun=${createNewRun}`)
-    aioLogger.debug(data)
     return aioAPIClient
         .post(`/project/${aioConfig.jiraProjectId}/testcycle/${aioConfig.cycleDetails.cycleKeyToReportTo}/testcase/${caseKey}/testrun?createNewRun=${createNewRun}`, data)
         .then(function (response) {
@@ -141,7 +193,7 @@ function postResult(aioConfig,caseKey, attemptData, caseData, screenshots, attem
         .catch(async err => {
             debugLogError(err)
             if(err.response) {
-                if (err.response.status == 429 && trialCounter < 3) {
+                if (err.response.status === 429 && trialCounter < 3) {
                     aioLogger.log("Reached AIO rate limits.  Pausing..")
                     await sleep(rateLimitWaitTime);
                     return postResult(aioConfig, caseKey, attemptData, caseData, screenshots, attemptNumber, trialCounter++);
@@ -270,74 +322,128 @@ function getOrCreateFolder(jiraProjectId, aioCycleConfig) {
     return Promise.resolve();
 }
 
-const getOrCreateCycle = (aioConfig) => {
+const getOrCreateCycle = async (aioConfig) => {
     aioLogger.logStartEnd("Determining cycle to update");
     initAPIClient(aioConfig);
-    if(!aioAPIClient) {
+    if (!aioAPIClient) {
         return Promise.resolve("Please specify valid credentials to connect with AIO Tests.");
     }
-    if(!aioConfig.cycleDetails) {
+    if (!aioConfig.cycleDetails) {
         aioLogger.error("Please specify cycleDetails in config.  eg. \"cycleDetails\": {\"cycleKey\":\"AT-CY-11\"}", true);
         return Promise.resolve();
     } else {
         let aioCycleConfig = aioConfig.cycleDetails;
-        if(aioCycleConfig.createNewCycle) {
-            let cycleTitle = aioCycleConfig.cycleName;
-            if(!!!cycleTitle){
-                return Promise.resolve("createNewCycle is true in config.  New cycle name is mandatory.", true)
-            } else {
-                aioLogger.log("Creating cycle : " + cycleTitle);
-                let folderCreationPromise = getOrCreateFolder(aioConfig.jiraProjectId, aioCycleConfig);
-                return folderCreationPromise.then((folderCreationResponse) => {
-                    aioLogger.debug("Folder task resolved.  Creating cycle.")
-                    let createCycleBody = {
-                        title: cycleTitle
-                    }
-                    if(folderCreationResponse) {
-                        createCycleBody.folder = folderCreationResponse.data;
-                    }
-                    if(aioCycleConfig.tasks && aioCycleConfig.tasks.length > 0 && Array.isArray(aioCycleConfig.tasks)) {
-                        let jiraTasks = aioCycleConfig.tasks.filter(f => f && !!f.trim());
-                        if(jiraTasks.length > 0) {
-                            createCycleBody.jiraTaskIDs = jiraTasks;
-                        }
-                    }
-                    aioLogger.debug("Cycle endpoint " + "/project/"+ aioConfig.jiraProjectId+"/testcycle/detail");
-                    aioLogger.debug(createCycleBody)
-                    return aioAPIClient.post("/project/"+ aioConfig.jiraProjectId+"/testcycle/detail", createCycleBody)
-                        .then(function (response) {
-                            aioCycleConfig["cycleKeyToReportTo"] = response.data.key;
-                            aioLogger.log("Cycle created successfully : " + aioCycleConfig.cycleKeyToReportTo )
-                        })
-                        .catch(function (error) {
-                            debugLogError(error);
-                            if(error.response) {
-                                if (error.response.status === 401 || error.response.status === 403) {
-                                    return Promise.resolve("Authorization error.  Please check credentials.")
-                                } else {
-                                    return Promise.resolve(error.response.status + " : " + error.response.data);
-                                }
-                            }
-                        });
-                }).catch((error) => {
-                    debugLogError(error);
-                    if(error.response) {
-                        aioLogger.error(error.response.status + " : " + error.response.data)
-                    }
-                    return Promise.resolve("Error in fetching or creating cycle folder.  " +
-                        "Please check format of folder, for eg. [\"Cloud\",\"Release1\"]");
-                })
-            }
-        } else {
-            if(!!!aioCycleConfig.cycleKey) {
-                return Promise.resolve("createNewCycle is false in config.  Please specify a cycle key (eg. AT-CY-11) as \"cycleKey\":\"AT-CY=11\"", true);
-            } else {
-                aioCycleConfig["cycleKeyToReportTo"] = aioCycleConfig.cycleKey;
-            }
+        if(!(createNewCycleOptions.includes(aioCycleConfig.createNewCycle))){
+            return Promise.resolve(
+                `Invalid value for createNewCycle "${aioCycleConfig.createNewCycle}". Valid values include ${createNewCycleOptions}.`
+            );
+        }
+        if((!aioCycleConfig.createNewCycle || "false" === aioCycleConfig.createNewCycle) && aioCycleConfig.cycleKey){
+            aioCycleConfig["cycleKeyToReportTo"] = aioCycleConfig.cycleKey;
             return Promise.resolve();
         }
+
+        if(aioCycleConfig.createNewCycle === true || "true" === aioCycleConfig.createNewCycle || aioCycleConfig.createNewCycle === CREATE_IF_ABSENT) {
+            let cycleTitle = aioCycleConfig.cycleName;
+            let customFields = aioCycleConfig.customFields;
+            if (!!!cycleTitle) {
+                return Promise.resolve("createNewCycle is set to " + aioCycleConfig.createNewCycle +" in config.  Please set cycleName.")
+            }
+            if(aioCycleConfig.createNewCycle === CREATE_IF_ABSENT) {
+                let results = await findExistingCycleThroughName(aioConfig);
+                if (results === true) {
+                    aioLogger.debug("Existing cycle found")
+                    //Cycle found and set.
+                    return;
+                }
+                if (results !== false) {
+                    //Error while finding cycle.
+                    aioLogger.log(results)
+                    return;
+                }
+            }
+
+            aioLogger.log("Creating cycle : " + cycleTitle);
+            let folderCreationPromise = getOrCreateFolder(aioConfig.jiraProjectId, aioCycleConfig);
+            return folderCreationPromise.then((folderCreationResponse) => {
+                aioLogger.debug("Folder task resolved.  Creating cycle.")
+                let createCycleBody = {
+                    title: cycleTitle,
+                    customFields: customFields || null
+                }
+                if (folderCreationResponse) {
+                    createCycleBody.folder = folderCreationResponse.data;
+                }
+                if (aioCycleConfig.tasks && aioCycleConfig.tasks.length > 0 && Array.isArray(aioCycleConfig.tasks)) {
+                    let jiraTasks = aioCycleConfig.tasks.filter(f => f && !!f.trim());
+                    if (jiraTasks.length > 0) {
+                        createCycleBody.jiraTaskIDs = jiraTasks;
+                    }
+                }
+                aioLogger.debug("Cycle endpoint " + "/project/" + aioConfig.jiraProjectId + "/testcycle/detail");
+                return aioAPIClient.post("/project/" + aioConfig.jiraProjectId + "/testcycle/detail", createCycleBody)
+                    .then(function (response) {
+                        aioCycleConfig["cycleKeyToReportTo"] = response.data.key;
+                        aioLogger.log("Cycle created successfully : " + aioCycleConfig.cycleKeyToReportTo)
+                    })
+                    .catch(function (error) {
+                        debugLogError(error);
+                        if (error.response) {
+                            if (error.response.status === 401 || error.response.status === 403) {
+                                return Promise.resolve("Authorization error.  Please check credentials.")
+                            } else {
+                                return Promise.resolve(error.response.status + " : " + error.response.data);
+                            }
+                        }
+                    });
+            }).catch((error) => {
+                debugLogError(error);
+                if (error.response) {
+                    aioLogger.error(error.response.status + " : " + error.response.data)
+                }
+                return Promise.resolve("Error in fetching or creating cycle folder.  " +
+                    "Please check format of folder, for eg. [\"Cloud\",\"Release1\"]");
+            })
+
+        }
+        return Promise.resolve("createNewCycle is false in config.  Please specify a cycle key (eg. AT-CY-11) as \"cycleKey\":\"AT-CY=11\" or cycle name (eg. NVTES) as \"cycleName\":\"NVTES\" ", true);
     }
 
+}
+
+async function findExistingCycleThroughName(aioConfig) {
+    if (aioConfig.parallelBuild && aioConfig.parallelBuild.masterBuild === false) {
+        let to = aioConfig.parallelBuild.waitForSeconds? aioConfig.parallelBuild.waitForSeconds: 2;
+        aioLogger.log(`Waiting for ${to} seconds for master build to finish`)
+        await new Promise(resolve => setTimeout(resolve, to*1000));
+    }
+    let body = {
+        "title": {
+            "comparisonType": "EXACT_MATCH",
+            "value": aioConfig.cycleDetails.cycleName.trim()
+        }
+    }
+    aioLogger.log("Finding cycle with name : " + aioConfig.cycleDetails.cycleName.trim())
+    return aioAPIClient.post(`/project/${aioConfig.jiraProjectId}/testcycle/search`, body)
+        .then(function (response) {
+            const items = response?.data?.items;
+            if (items && items.length > 0) {
+                aioConfig.cycleDetails["cycleKeyToReportTo"] = items[0]?.key;
+                return true;
+            } else {
+                return false;
+            }
+        })
+        .catch(function (error) {
+            debugLogError(error);
+            if (error.response) {
+                if (error.response.status === 401 || error.response.status === 403) {
+                    return Promise.resolve("Authorization error.  Please check credentials.")
+                } else {
+                    return Promise.resolve(error.response.status + " : " + error.response.data);
+                }
+            }
+        });
 }
 
 function getAIORunStatus(cypressStatusString) {
@@ -361,4 +467,4 @@ function debugLogError(error){
     }
 }
 
-module.exports = { reportSpecResults, getOrCreateCycle }
+module.exports = { reportSpecResults, getOrCreateCycle, updateRunFields }

@@ -11,7 +11,7 @@ module.exports = defineConfig({
     "aioTests": {
       "enableReporting": true,
       "hosted" : {
-        "jiraUrl": "https://jira8.aioreports.com",
+        "jiraUrl": "https://jira.aiojiraapps.com",
         "jiraPAT": "",
         "jiraUsername": "",
         "jiraPassword": ""
@@ -22,12 +22,16 @@ module.exports = defineConfig({
         "cycleName": "Cypress nightly runs ",
         "cycleKey": "NVTES-CY-64",
         "folder": ["Cloud","Smoke Test Nightly"],
-        "tasks": ["NVTES-1"]
+        "tasks": ["NVTES-1"],
       },
       "addNewRun": false,
       "addAttachmentToFailedCases": true,
       "createNewRunForRetries": false,
-      "addTestBodyToComments": true
+      "addTestBodyToComments": true,
+      "parallelBuild":{
+        "masterBuild": true,
+        "waitForSeconds": 10
+      }
     }
   }
 });
